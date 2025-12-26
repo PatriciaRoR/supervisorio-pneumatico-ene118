@@ -15,7 +15,7 @@ class monitoramento(object):
 
         if nome in self.variaveis: 
 
-        self.variaveis[nome] = valor
+            self.variaveis[nome] = valor
 
     def obter_variaveis(self):
         "Retorna o dicionário com todas as variáveis monitoradas. "
@@ -25,5 +25,9 @@ class monitoramento(object):
         "Retorna o historico temporal de uma variável especifica. "
 
         return self.historico.get(nome, [])
+    def obter_todas(self):
+        "Retorna todas as variáveis monitoradas. "
+
+        return self.variaveis
     
     
