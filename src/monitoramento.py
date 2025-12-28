@@ -2,7 +2,7 @@
 Módulo de monitoramento em tempo real do sistema pneumático.
 Responsável pela leitura e organização das variáveis dp processo.
 """
-class monitoramento(object):
+class Monitoramento(object):
     "classe responsável pelo monitoramento das variáveis do sistema pneumático. "
     
     def __init__(self):
