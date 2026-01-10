@@ -1,80 +1,100 @@
 """
 Módulo de monitoramento em tempo real do sistema pneumático.
-Responsável pela leitura e organização das variáveis dp processo.
+Responsável pela leitura e organização das variáveis do processo.
 """
 
-# Módulo time não é importado automaticamente
 import time
+from pyModbusTCP.client import ModbusClient
 
 
 class Monitoramento(object):
     """
-    Classe responsável pelo monitoramento das variáveis do sistema pneumático. 
+    Classe responsável pelo monitoramento das variáveis do sistema pneumático.
     """
-    
-    def __init__(self):
+
+    def __init__(self, ip='', port=502):
         """
-        Incializa as variáveis monitoradas do processo e o historico temporal
+        Inicializa variáveis, tags, medições e cliente Modbus.
         """
-        
-        self.variaveis = {}
-        self.historico = {}
-        self.executando = False  # controle do loop de monitoramento
+
+        # Dicionário de variáveis
+        self.variaveis = {
+            "pressao_ar": {
+                "endereco": 0,
+                "tipo": "input",
+                "valor": 0.0
+            },
+            "valvula_principal": {
+                "endereco": 1,
+                "tipo": "coil",
+                "valor": False
+            }
+        }
+
+        # Tags do processo
+        self._tags = []
+        for nome, var in self.variaveis.items():
+            self._tags.append({
+                "name": nome,
+                "address": var["endereco"],
+                "type": var["tipo"]
+            })
+
+        # Estrutura de medições
+        self._meas = {
+            "timestamp": None,
+            "values": {}
+        }
+
+        self.executando = False
+
+        # Cliente Modbus 
+        self.client = ModbusClient(
+            host=ip,
+            port=port,
+            auto_open=True,
+            auto_close=False
+        )
 
     def atualizar_variavel(self, nome, valor):
-        """
-        Atualiza o valor de uma variável monitorada
-        Se uma variável ainda não existir ela é criada
-        """
-        # tempo real
         timestamp = time.time()
 
-        # cria a variável se não existir
-        if nome not in self.variaveis: 
-            self.variaveis[nome] = valor
-            self.historico[nome] = []
-        else:
-            self.variaveis[nome] = valor
-
-        # salva histórico
-        self.historico[nome].append((timestamp, valor))
+        if nome in self.variaveis:
+            self.variaveis[nome]["valor"] = valor
+            self._meas["timestamp"] = timestamp
+            self._meas["values"][nome] = valor
 
     def obter_variaveis(self):
-        """
-        Retorna o dicionário com todas as variáveis monitoradas. 
-        """
         return self.variaveis
 
-    def obter_historico(self, nome):
-        """
-        Retorna o historico temporal de uma variável especifica.
-        """
-        return self.historico.get(nome, [])
+    def obter_medicoes(self):
+        return self._meas
 
-    def obter_todas(self):
-        """
-        Retorna todas as variáveis monitoradas.
-        """
-        return self.variaveis
+    # Leitura Modbus
+
+    def readData(self):
+        for tag in self._tags:
+            try:
+                if tag["type"] == "input":
+                    val = self.client.read_input_registers(tag["address"], 1)
+                    if val:
+                        self.atualizar_variavel(tag["name"], val[0])
+
+                elif tag["type"] == "coil":
+                    val = self.client.read_coils(tag["address"], 1)
+                    if val:
+                        self.atualizar_variavel(tag["name"], bool(val[0]))
+
+            except Exception as e:
+                print(f"Erro Modbus ({tag['name']}): {e}")
 
     def executar_monitoramento(self, scan_time=1):
-        """
-        Executa o ciclo contínuo de monitoramento.
-        scan_time: tempo de varredura em segundos.
-        """
         self.executando = True
 
         while self.executando:
-            # Simulação provisória de leitura do processo
-            valor_atual = self.variaveis.get("pressao_ar", 0)
-            self.atualizar_variavel("pressao_ar", valor_atual + 0.1)
-
+            # leitura real via Modbus
+            self.readData()
             time.sleep(scan_time)
 
     def parar_monitoramento(self):
-        """
-        Interrompe o ciclo de monitoramento.
-        """
         self.executando = False
-
-    
