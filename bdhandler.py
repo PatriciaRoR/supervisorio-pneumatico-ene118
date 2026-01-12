@@ -110,3 +110,25 @@ def _acquisition_loop(self, interval):
         time.sleep(interval)
 
     session.close()
+
+# =====================================================
+# CONSULTA HISTÓRICA (THREAD PRINCIPAL)
+# =====================================================
+def get_history(self, variable_name, t_ini, t_fim):
+    """
+        Retorna lista de (timestamp, valor)
+    """
+    session = self.Session()
+
+    with self.lock:
+        results = (
+            session.query(
+                CompressorData.timestamp,
+                getattr(CompressorData, variable_name)
+            )
+            .filter(CompressorData.timestamp.between(t_ini, t_fim))
+            .all()
+        )
+
+    session.close()
+    return results
