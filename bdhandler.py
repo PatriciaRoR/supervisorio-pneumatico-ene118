@@ -17,7 +17,7 @@ class CompressorData(Base):
     __tablename__ = "compressor_data"
 
     id = Column(Integer, primary_key=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.now)
 
     temp_enrolamento_r = Column(Float)
     temp_carcaca = Column(Float)
@@ -53,83 +53,83 @@ class BDHandler:
         self.lock = threading.Lock()
         self.running = False
 
-# =====================================================
-# THREAD DE AQUISIÇÃO / INSERÇÃO
-# =====================================================
-def start_insertion_thread(self, interval=1.0):
-    self.running = True
-    thread = threading.Thread(
-        target=self._acquisition_loop,
-        args=(interval,),
-        daemon=True
-    )
-    thread.start()
+    # =====================================================
+    # THREAD DE AQUISIÇÃO / INSERÇÃO
+    # =====================================================
+    def start_insertion_thread(self, interval=1.0):
+        self.running = True
+        thread = threading.Thread(
+            target=self._acquisition_loop,
+            args=(interval,),
+            daemon=True
+        )
+        thread.start()
 
-def stop(self):
-    self.running = False
-    self.client.close()
+    def stop(self):
+        self.running = False
+        self.client.close()
 
-def _acquisition_loop(self, interval):
-    """
-    Thread secundária:
-    - Lê dados via MODBUS
-    - Insere no banco usando ORM
-    """
-    session = self.Session()
+    def _acquisition_loop(self, interval):
+        """
+        Thread secundária:
+        - Lê dados via MODBUS
+        - Insere no banco usando ORM
+        """
+        session = self.Session()
 
-    while self.running:
-        try:
-            rr = self.client.read_holding_registers(
-                address=0,
-                count=10,
-                device_id=self.device_id
-            )
-
-            if rr and not rr.isError():
-                r = rr.registers
-
-                row = CompressorData(
-                    temp_enrolamento_r=r[0] / 10.0,
-                    temp_carcaca=r[1] / 10.0,
-                    velocidade_ar=float(r[2]),
-                    pressao_tubo_azul=float(r[3]),
-                    torque=float(r[4]),
-                    pressao=float(r[5]),
-                    vazao=float(r[6]),
-                    pressao_reservatorio=float(r[7]),
-                    vazao_valvula_01=float(r[8]),
-                    torque_medido=float(r[9]),
+        while self.running:
+            try:
+                rr = self.client.read_holding_registers(
+                    address=0,
+                    count=10,
+                    device_id=self.device_id
                 )
 
-                with self.lock:
-                    session.add(row)
-                    session.commit()
+                if rr and not rr.isError():
+                    r = rr.registers
 
-        except Exception as e:
-            print(f"[BDHandler] Erro MODBUS/DB: {e}")
+                    row = CompressorData(
+                        temp_enrolamento_r=r[0] / 10.0,
+                        temp_carcaca=r[1] / 10.0,
+                        velocidade_ar=float(r[2]),
+                        pressao_tubo_azul=float(r[3]),
+                        torque=float(r[4]),
+                        pressao=float(r[5]),
+                        vazao=float(r[6]),
+                        pressao_reservatorio=float(r[7]),
+                        vazao_valvula_01=float(r[8]),
+                        torque_medido=float(r[9]),
+                    )
 
-        time.sleep(interval)
+                    with self.lock:
+                        session.add(row)
+                        session.commit()
 
-    session.close()
+            except Exception as e:
+                print(f"[BDHandler] Erro MODBUS/DB: {e}")
 
-# =====================================================
-# CONSULTA HISTÓRICA (THREAD PRINCIPAL)
-# =====================================================
-def get_history(self, variable_name, t_ini, t_fim):
-    """
-        Retorna lista de (timestamp, valor)
-    """
-    session = self.Session()
+            time.sleep(interval)
 
-    with self.lock:
-        results = (
-            session.query(
-                CompressorData.timestamp,
-                getattr(CompressorData, variable_name)
+        session.close()
+
+    # =====================================================
+    # CONSULTA HISTÓRICA (THREAD PRINCIPAL)
+    # =====================================================
+    def get_history(self, variable_name, t_ini, t_fim):
+        """
+            Retorna lista de (timestamp, valor)
+        """
+        session = self.Session()
+
+        with self.lock:
+            results = (
+                session.query(
+                    CompressorData.timestamp,
+                    getattr(CompressorData, variable_name)
+                )
+                .filter(CompressorData.timestamp.between(t_ini, t_fim))
+                .all()
             )
-            .filter(CompressorData.timestamp.between(t_ini, t_fim))
-            .all()
-        )
 
-    session.close()
-    return results
+        session.close()
+        return results
