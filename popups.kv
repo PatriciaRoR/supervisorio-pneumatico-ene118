@@ -1,0 +1,63 @@
+<HistTablePopup>:
+    title: "Histórico de Dados do Processo"
+    size_hint: 0.95, 0.95
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: 5
+        spacing: 5
+
+        BoxLayout:
+            size_hint_y: 0.15
+            spacing: 5
+
+            Spinner:
+                id: spinner_var
+                text: "Selecione a variável"
+                values: root.var_names
+
+            TextInput:
+                id: txt_ini
+                hint_text: "Data/Hora inicial (DD/MM/AAAA HH:MM:SS)"
+                multiline: False
+
+            TextInput:
+                id: txt_fim
+                hint_text: "Data/Hora final (DD/MM/AAAA HH:MM:SS)"
+                multiline: False
+
+            Button:
+                text: "Buscar"
+                on_release: root.buscar()
+
+        GridLayout:
+            cols: 4
+            size_hint_y: None
+            height: self.minimum_height
+
+            Label:
+                text: "[b]Variável[/b]"
+                markup: True
+            Label:
+                text: "[b]Valor[/b]"
+                markup: True
+            Label:
+                text: "[b]Horário[/b]"
+                markup: True
+            Label:
+                text: "[b]Data[/b]"
+                markup: True
+
+        ScrollView:
+            GridLayout:
+                id: table
+                cols: 4
+                size_hint_y: None
+                height: self.minimum_height
+                row_default_height: 30
+                row_force_default: True
+
+        Button:
+            text: "Fechar"
+            size_hint_y: 0.1
+            on_release: root.dismiss()
