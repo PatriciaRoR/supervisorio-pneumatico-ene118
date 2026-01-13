@@ -1,0 +1,16 @@
+<MainWidget>:
+    orientation: "vertical"
+    padding: 10
+    spacing: 10
+
+    Label:
+        text: "SCADA - Compressor Pneumático"
+        font_size: 20
+        size_hint_y: 0.15
+
+    Button:
+        text: "Consultar Histórico de Dados"
+        size_hint_y: 0.15
+        on_release: root.abrir_historico()
+
+    Widget:
