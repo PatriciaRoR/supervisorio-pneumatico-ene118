@@ -58,12 +58,12 @@ class BDHandler:
     # =====================================================
     def start_insertion_thread(self, interval=1.0):
         self.running = True
-        thread = threading.Thread(
+        self.thread = threading.Thread(
             target=self._acquisition_loop,
             args=(interval,),
             daemon=True
         )
-        thread.start()
+        self.thread.start()
 
     def stop(self):
         self.running = False
