@@ -29,12 +29,12 @@ class Monitoramento(object):
             "bc.pit01":     {"addr": None, "type": "calc", "div": 1},
             "bc.fit01":     {"addr": None, "type": "calc", "div": 1},
 
-            "ve.pit01":     {"addr": 1224, "type": "FP",   "div": 10},
-            "ve.velocidade":{"addr": 712,  "type": "FP",   "div": 1},
+            "ve.pit01":      {"addr": 1224, "type": "FP", "div": 10},
+            "ve.velocidade": {"addr": 712,  "type": "FP", "div": 1},
 
-            "co.pressao":   {"addr": 714,  "type": "FP",   "div": 1},
-            "co.fit03":     {"addr": 718,  "type": "FP",   "div": 1},
-            "co.torque":    {"addr": 1420, "type": "FP",   "div": 1},
+            "co.pressao": {"addr": 714, "type": "FP", "div": 1},
+            "co.fit03":   {"addr": 718, "type": "FP", "div": 1},
+            "co.torque":  {"addr": 1420, "type": "FP", "div": 1},
 
             "es.temp_r":    {"addr": None, "type": "calc", "div": 1},
             "es.temp_carc": {"addr": None, "type": "calc", "div": 1},
@@ -116,7 +116,6 @@ class Monitoramento(object):
         for nome, cfg in self._tags.items():
 
             if cfg["type"] == "calc":
-                # variável calculada ou não disponibilizada via CLP
                 continue
 
             try:
@@ -133,7 +132,27 @@ class Monitoramento(object):
             except Exception as e:
                 print(f"Erro Modbus ({nome}): {e}")
 
-    # 7. LÓGICA DE ATUAÇÃO E CONTROLE AUTOMÁTICO
+    # 7. ATUALIZA VARIÁVEIS CALCULADAS
+
+    def atualizar_variaveis_calculadas(self):
+        """
+        Atualiza variáveis que não são lidas diretamente do CLP,
+        mas são derivadas de outras medições do processo.
+        """
+
+        v = self._meas["values"]
+
+        v["bc.pit01"] = v.get("co.pressao")
+        v["bc.fit01"] = v.get("co.fit03")
+        v["bc.torque"] = v.get("co.torque")
+
+        # exemplo conceitual de temperatura
+        corrente_media = v.get("ve.corrente_media_co")
+        if corrente_media is not None:
+            v["es.temp_r"] = corrente_media
+            v["es.temp_carc"] = corrente_media
+
+    # 8. LÓGICA DE ATUAÇÃO E CONTROLE AUTOMÁTICO
 
     def controle(self):
         """
@@ -144,7 +163,6 @@ class Monitoramento(object):
 
         if pressao is not None:
 
-            # liga/desliga motor
             if pressao < 5:
                 self.client.write_single_coil(
                     self._controls["liga_motor"]["addr"], True
@@ -154,42 +172,38 @@ class Monitoramento(object):
                     self._controls["liga_motor"]["addr"], False
                 )
 
-            # controle da válvula
             self.client.write_single_coil(
                 self._controls["valvula_01"]["addr"],
                 pressao > 6
             )
 
-            # ajuste automático de velocidade
             velocidade = int(min(max(pressao * 10, 0), 100))
             self.client.write_single_register(
                 self._controls["vel_motor"]["addr"], velocidade
             )
 
-    # 8. CONTROLE MANUAL DE VELOCIDADE
+    # 9. CONTROLE MANUAL DE VELOCIDADE
 
     def set_velocidade(self, valor):
         """
         Define manualmente a velocidade do motor.
-        Valor limitado entre 0 e 100%.
         """
         valor = int(min(max(valor, 0), 100))
         self.client.write_single_register(
             self._controls["vel_motor"]["addr"], valor
         )
 
-    # 9. MÉTODO DE PARTIDA
+    # 10. MÉTODO DE PARTIDA
 
     def set_metodo_partida(self, metodo):
         """
         Define o método de partida do motor.
-        0 = direta | 1 = soft-starter | 2 = inversor
         """
         self.client.write_single_register(
             self._controls["metodo_partida"]["addr"], metodo
         )
 
-    # 10. LOOP PRINCIPAL
+    # 11. LOOP PRINCIPAL
 
     def executar_monitoramento(self, scan_time=1):
         """
@@ -199,6 +213,7 @@ class Monitoramento(object):
 
         while self.executando:
             self.readData()
+            self.atualizar_variaveis_calculadas()
             self.controle()
             time.sleep(scan_time)
 
