@@ -1,77 +1,113 @@
 """
-Arquivo principal de TESTE do módulo de monitoramento.
-
-Usado para:
-- Validar comunicação Modbus
-- Testar leitura das variáveis
-- Testar atuação (motor, válvula, velocidade)
-ANTES da integração com Kivy e Banco de Dados.
+Main de testes para o módulo Monitoramento.
+Testas individuais para todas as funções do supervisório
 """
 
 import time
 from monitoramento import Monitoramento
 
 
+def menu():
+    print("\n================ MENU DE TESTES ================")
+    print("1  - Ler todas as variáveis (1 ciclo)")
+    print("2  - Loop de leitura contínua")
+    print("3  - Selecionar método de partida")
+    print("4  - Ligar motor")
+    print("5  - Desligar motor")
+    print("6  - Resetar motor")
+    print("7  - Ajustar velocidade do motor")
+    print("8  - Abrir válvula")
+    print("9  - Fechar válvula")
+    print("10 - Ajustar PID (P, I, D, SP)")
+    print("0  - Sair")
+    print("================================================")
+
+
 def main():
-    
-    # CONFIGURAÇÃO DA BANCADA / CLP
-    
-    IP_CLP = "127.0.0.1"      # simulador 
-    PORTA_CLP = 502
+    print("=== TESTE DO SUPERVISÓRIO - MODBUS TCP ===")
 
-    sistema = Monitoramento(ip=IP_CLP, port=PORTA_CLP)
+    ip = input("IP do CLP: ").strip()
+    porta = int(input("Porta Modbus (ex: 502): "))
 
-    print("=" * 70)
-    print(" TESTE DE BANCADA – MONITORAMENTO PNEUMÁTICO ")
-    print("=" * 70)
-    print(f"Conectando em {IP_CLP}:{PORTA_CLP}")
-    print("CTRL+C para encerrar\n")
+    mon = Monitoramento(ip=ip, port=porta)
 
-    try:
-       
-        # TESTES INICIAIS DE ATUAÇÃO
-       
+    while True:
+        menu()
+        opcao = input("Escolha uma opção: ").strip()
 
-        print(">> Teste: método de partida = INVERSOR")
-        sistema.set_metodo_partida(2)
-        time.sleep(1)
+        if opcao == "1":
+            mon.readData()
+            print("\n--- DADOS LIDOS ---")
+            for k, v in mon._meas["values"].items():
+                print(f"{k:25s}: {v}")
 
-        print(">> Teste: ligando motor")
-        sistema.set_motor(True)
-        time.sleep(2)
+        elif opcao == "2":
+            print("Leitura contínua (CTRL+C para parar)")
+            try:
+                while True:
+                    mon.readData()
+                    print("\nTimestamp:", mon._meas["timestamp"])
+                    for k, v in mon._meas["values"].items():
+                        print(f"{k:25s}: {v}")
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\nLeitura interrompida.")
 
-        print(">> Teste: velocidade = 40%")
-        sistema.set_velocidade(40)
-        time.sleep(2)
+        elif opcao == "3":
+            print("1 = Soft | 2 = Inversor | 3 = Direta")
+            metodo = int(input("Selecione o método: "))
+            mon.set_metodo_partida(metodo)
+            print("Método de partida enviado.")
 
-        print(">> Iniciando leitura contínua...\n")
+        elif opcao == "4":
+            mon.ligar_motor(1)
+            print("Comando LIGAR enviado.")
 
-        # LOOP DE MONITORAMENTO
-        
-        while True:
-            sistema.readData()
-            sistema.atualizar_variaveis_calculadas()
+        elif opcao == "5":
+            mon.ligar_motor(0)
+            print("Comando DESLIGAR enviado.")
 
-            dados = sistema.get_measurements()
+        elif opcao == "6":
+            mon.ligar_motor(2)
+            print("Comando RESET enviado.")
 
-            print("\nTimestamp:",
-                  time.strftime("%H:%M:%S",
-                                time.localtime(dados["timestamp"])))
-            print("-" * 60)
+        elif opcao == "7":
+            vel = float(input("Velocidade (ex: 30 Hz): "))
+            mon.set_velocidade(vel)
+            print("Velocidade enviada.")
 
-            for tag, valor in dados["values"].items():
-                print(f"{tag:25s} : {valor}")
+        elif opcao == "8":
+            num = int(input("Número da válvula (1 a 6): "))
+            mon.set_valvula(num, True)
+            print(f"Válvula XV{num} ABERTA.")
 
-            time.sleep(1)
+        elif opcao == "9":
+            num = int(input("Número da válvula (1 a 6): "))
+            mon.set_valvula(num, False)
+            print(f"Válvula XV{num} FECHADA.")
 
-    except KeyboardInterrupt:
-        print("\nEncerrando teste...")
-        print(">> Desligando motor por segurança")
-        sistema.set_motor(False)
+        elif opcao == "10":
+            print("Deixe em branco para não alterar.")
+            p = input("P: ")
+            i = input("I: ")
+            d = input("D: ")
+            sp = input("SP: ")
 
-    except Exception as e:
-        print("\nERRO:", e)
-        sistema.set_motor(False)
+            params = {}
+            if p: params["p"] = float(p)
+            if i: params["i"] = float(i)
+            if d: params["d"] = float(d)
+            if sp: params["sp"] = float(sp)
+
+            mon.set_pid(**params)
+            print("Parâmetros PID enviados.")
+
+        elif opcao == "0":
+            print("Encerrando testes.")
+            break
+
+        else:
+            print("Opção inválida.")
 
 
 if __name__ == "__main__":
