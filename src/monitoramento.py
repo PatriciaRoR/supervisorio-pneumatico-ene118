@@ -1,77 +1,81 @@
 """
-Módulo de monitoramento em tempo real do sistema pneumático.
-Responsável pela leitura, organização das variáveis do processo
-e atuação básica no sistema.
+Módulo de monitoramento em tempo real do sistema pneumático (compressor).
+
 """
 
 import time
 import struct
 from pyModbusTCP.client import ModbusClient
 
+# Comunicação entre módulos (Kivy / BD / Backend)
+from comunicacao import com, Mensagem
+
 
 class Monitoramento(object):
     """
     Classe responsável pelo monitoramento e controle
-    do sistema pneumático.
+    do sistema pneumático (compressor).
     """
 
-    def __init__(self, ip='', port=502):
+    def __init__(self, ip="127.0.0.1", port=502):
         """
         Inicializa o sistema de monitoramento e controle.
+
         """
 
-        # 1. DEFINIÇÃO DAS TAGS DO PROCESSO (MONITORAMENTO)
-
+        # 1. TAGS DE MONITORAMENTO (≥ 25 VARIÁVEIS REAIS)
+        
         self._tags = {
 
-            # VARIÁVEIS PRINCIPAIS (algumas são calculadas / conceituais)
-            "bc.torque":    {"addr": None, "type": "calc", "div": 1},
-            "bc.pit01":     {"addr": None, "type": "calc", "div": 1},
-            "bc.fit01":     {"addr": None, "type": "calc", "div": 1},
+            # Processo Pneumático 
+            "co.pressao":        {"addr": 714, "type": "FP", "div": 1},
+            "co.fit03":          {"addr": 718, "type": "FP", "div": 1},
+            "co.torque":         {"addr": 1420, "type": "FP", "div": 1},
+            "co.velocidade":     {"addr": 712, "type": "FP", "div": 1},
 
-            "ve.pit01":      {"addr": 1224, "type": "FP", "div": 10},
-            "ve.velocidade": {"addr": 712,  "type": "FP", "div": 1},
+            # Temperaturas
+            "co.temp_r":         {"addr": 720, "type": "FP", "div": 1},
+            "co.temp_s":         {"addr": 721, "type": "FP", "div": 1},
+            "co.temp_t":         {"addr": 722, "type": "FP", "div": 1},
+            "co.temp_carc":      {"addr": 723, "type": "FP", "div": 1},
 
-            "co.pressao": {"addr": 714, "type": "FP", "div": 1},
-            "co.fit03":   {"addr": 718, "type": "FP", "div": 1},
-            "co.torque":  {"addr": 1420, "type": "FP", "div": 1},
+            # Correntes 
+            "co.corrente_r":     {"addr": 726, "type": "4X", "div": 10},
+            "co.corrente_s":     {"addr": 727, "type": "4X", "div": 10},
+            "co.corrente_t":     {"addr": 728, "type": "4X", "div": 10},
+            "co.corrente_n":     {"addr": 729, "type": "4X", "div": 10},
+            "co.corrente_media": {"addr": 731, "type": "4X", "div": 10},
 
-            "es.temp_r":    {"addr": None, "type": "calc", "div": 1},
-            "es.temp_carc": {"addr": None, "type": "calc", "div": 1},
+            # Potências
+            "co.ativa_r":        {"addr": 735, "type": "4X", "div": 1},
+            "co.ativa_s":        {"addr": 736, "type": "4X", "div": 1},
+            "co.ativa_t":        {"addr": 737, "type": "4X", "div": 1},
+            "co.ativa_total":    {"addr": 738, "type": "4X", "div": 1},
+            "co.reativa_total":  {"addr": 859, "type": "4X", "div": 1},
+            "co.aparente_total": {"addr": 863, "type": "4X", "div": 1},
 
-            # VARIÁVEIS ELÉTRICAS
-            "es.thd_tensao_rn": {"addr": 800, "type": "4X", "div": 10},
-            "es.thd_tensao_sn": {"addr": 801, "type": "4X", "div": 10},
-            "es.thd_tensao_tn": {"addr": 802, "type": "4X", "div": 10},
-            "es.thd_tensao_rs": {"addr": 804, "type": "4X", "div": 10},
-            "es.thd_tensao_st": {"addr": 805, "type": "4X", "div": 10},
-            "es.thd_tensao_tr": {"addr": 806, "type": "4X", "div": 10},
+            # Tensões 
+            "co.tensao_r":       {"addr": 820, "type": "4X", "div": 10},
+            "co.tensao_s":       {"addr": 821, "type": "4X", "div": 10},
+            "co.tensao_t":       {"addr": 822, "type": "4X", "div": 10},
 
-            # POTÊNCIA ATIVA DO COMPRESSOR
-            "ve.ativa_r_co":     {"addr": 735, "type": "4X", "div": 1},
-            "ve.ativa_s_co":     {"addr": 736, "type": "4X", "div": 1},
-            "ve.ativa_t_co":     {"addr": 737, "type": "4X", "div": 1},
-            "ve.ativa_total_co": {"addr": 738, "type": "4X", "div": 1},
-
-            # CORRENTES DO COMPRESSOR
-            "ve.corrente_r_co":     {"addr": 726, "type": "4X", "div": 10},
-            "ve.corrente_s_co":     {"addr": 727, "type": "4X", "div": 10},
-            "ve.corrente_t_co":     {"addr": 728, "type": "4X", "div": 10},
-            "ve.corrente_n_co":     {"addr": 729, "type": "4X", "div": 10},
-            "ve.corrente_media_co": {"addr": 731, "type": "4X", "div": 10},
+            # Qualidade de Energia 
+            "co.thd_r":          {"addr": 800, "type": "4X", "div": 10},
+            "co.thd_s":          {"addr": 801, "type": "4X", "div": 10},
+            "co.thd_t":          {"addr": 802, "type": "4X", "div": 10},
         }
 
         # 2. TAGS DE ATUAÇÃO E CONTROLE
-
+       
         self._controls = {
             "liga_motor":     {"addr": 2,    "type": "coil"},
             "valvula_01":     {"addr": 3,    "type": "coil"},
-            "vel_motor":      {"addr": 1313, "type": "4X"},
-            "metodo_partida": {"addr": 1324, "type": "4X"}  # 0=direta | 1=soft | 2=inversor
+            "vel_motor":      {"addr": 1313, "type": "4X"},   # 0–100 %
+            "metodo_partida": {"addr": 1324, "type": "4X"}    # 0=direta | 1=soft | 2=inversor
         }
 
         # 3. ESTRUTURA DE MEDIÇÕES
-
+        
         self._meas = {
             "timestamp": None,
             "values": {}
@@ -79,7 +83,9 @@ class Monitoramento(object):
 
         self.executando = False
 
+        
         # 4. CLIENTE MODBUS
+        
 
         self.client = ModbusClient(
             host=ip,
@@ -88,36 +94,36 @@ class Monitoramento(object):
             auto_close=False
         )
 
-    # 5. LEITURA FLOAT (FP – 32 BITS)
+        # 5. COMUNICAÇÃO COM KIVY / BD
+        
+        # Recebe comandos enviados pela interface
+        com.receber("comando_kivy", self._processar_comando_kivy)
+  
+        # 6. LEITURA DE FLOAT (32 BITS)
 
     def _read_float(self, addr):
         """
-        Lê dois registradores Modbus (32 bits) e converte para float.
+        Lê dois registradores Modbus consecutivos
+        e converte para float IEEE 754.
         """
         regs = self.client.read_holding_registers(addr, 2)
         if regs and len(regs) == 2:
             packed = struct.pack(">HH", regs[0], regs[1])
             return struct.unpack(">f", packed)[0]
         return None
-
-    # 6. LEITURA DAS VARIÁVEIS DO PROCESSO
+ 
+        # 7. LEITURA DAS VARIÁVEIS DO PROCESSO
 
     def readData(self):
         """
-        Realiza a leitura das variáveis do processo.
-        Variáveis do tipo 'calc' não são lidas diretamente do CLP.
+        Realiza a leitura de todas as variáveis do processo
+        e atualiza a estrutura interna de medições.
         """
 
         self._meas["timestamp"] = time.time()
-
-        # limpa valores antigos para evitar reaproveitar dados
         self._meas["values"] = {}
 
         for nome, cfg in self._tags.items():
-
-            if cfg["type"] == "calc":
-                continue
-
             try:
                 if cfg["type"] == "FP":
                     valor = self._read_float(cfg["addr"])
@@ -132,79 +138,85 @@ class Monitoramento(object):
             except Exception as e:
                 print(f"Erro Modbus ({nome}): {e}")
 
-    # 7. ATUALIZA VARIÁVEIS CALCULADAS
+        # Envia dados lidos para Kivy e Banco
+        self._enviar_dados_para_kivy()
+   
+       # 8. ENVIO DE DADOS PARA KIVY / BD
 
-    def atualizar_variaveis_calculadas(self):
+    def _enviar_dados_para_kivy(self):
         """
-        Atualiza variáveis que não são lidas diretamente do CLP,
-        mas são derivadas de outras medições do processo.
+        Envia as medições atuais para a interface gráfica
+        e para o Banco de Dados.
         """
+        mensagem = Mensagem(
+            tipo="dados_monitoramento",
+            dados=self._meas.copy(),
+            origem="monitoramento"
+        )
+        com.enviar(mensagem)
+    
+        # 9. PROCESSAMENTO DE COMANDOS DO KIVY   
 
-        v = self._meas["values"]
-
-        v["bc.pit01"] = v.get("co.pressao")
-        v["bc.fit01"] = v.get("co.fit03")
-        v["bc.torque"] = v.get("co.torque")
-
-        # exemplo conceitual de temperatura
-        corrente_media = v.get("ve.corrente_media_co")
-        if corrente_media is not None:
-            v["es.temp_r"] = corrente_media
-            v["es.temp_carc"] = corrente_media
-
-    # 8. LÓGICA DE ATUAÇÃO E CONTROLE AUTOMÁTICO
-
-    def controle(self):
+    def _processar_comando_kivy(self, comando):
         """
-        Executa ações automáticas de controle baseadas na pressão.
+        Recebe e executa comandos enviados pela interface Kivy.
         """
+        acao = comando.get("acao")
 
-        pressao = self._meas["values"].get("co.pressao")
+        if acao == "ligar_motor":
+            self.ligar_motor(comando.get("ligar", True))
 
-        if pressao is not None:
+        elif acao == "set_velocidade":
+            self.set_velocidade(comando.get("valor", 0))
 
-            if pressao < 5:
-                self.client.write_single_coil(
-                    self._controls["liga_motor"]["addr"], True
-                )
-            elif pressao > 8:
-                self.client.write_single_coil(
-                    self._controls["liga_motor"]["addr"], False
-                )
+        elif acao == "set_metodo_partida":
+            self.set_metodo_partida(comando.get("valor", 0))
 
-            self.client.write_single_coil(
-                self._controls["valvula_01"]["addr"],
-                pressao > 6
+        elif acao == "acionar_valvula":
+            self.acionar_valvula(
+                comando.get("numero", 1),
+                comando.get("aberta", True)
             )
 
-            velocidade = int(min(max(pressao * 10, 0), 100))
-            self.client.write_single_register(
-                self._controls["vel_motor"]["addr"], velocidade
-            )
+        # 10. ATUAÇÃO E CONTROLE  
 
-    # 9. CONTROLE MANUAL DE VELOCIDADE
-
-    def set_velocidade(self, valor):
+    def ligar_motor(self, ligar=True):
         """
-        Define manualmente a velocidade do motor.
+        Liga ou desliga o motor do compressor.
         """
-        valor = int(min(max(valor, 0), 100))
-        self.client.write_single_register(
-            self._controls["vel_motor"]["addr"], valor
+        self.client.write_single_coil(
+            self._controls["liga_motor"]["addr"], ligar
         )
 
-    # 10. MÉTODO DE PARTIDA
+    def acionar_valvula(self, numero, aberta):
+        """
+        Aciona válvula do sistema pneumático.
+        """
+        if numero == 1:
+            self.client.write_single_coil(
+                self._controls["valvula_01"]["addr"], aberta
+            )
+
+    def set_velocidade(self, percentual):
+        """
+        Define a velocidade do motor (0 a 100 %).
+        """
+        percentual = int(min(max(percentual, 0), 100))
+        self.client.write_single_register(
+            self._controls["vel_motor"]["addr"], percentual
+        )
 
     def set_metodo_partida(self, metodo):
         """
         Define o método de partida do motor.
+        0 = direta | 1 = soft-starter | 2 = inversor
         """
         self.client.write_single_register(
             self._controls["metodo_partida"]["addr"], metodo
         )
 
-    # 11. LOOP PRINCIPAL
-
+        # 11. LOOP PRINCIPAL
+     
     def executar_monitoramento(self, scan_time=1):
         """
         Executa o monitoramento contínuo do sistema.
@@ -213,12 +225,10 @@ class Monitoramento(object):
 
         while self.executando:
             self.readData()
-            self.atualizar_variaveis_calculadas()
-            self.controle()
             time.sleep(scan_time)
 
     def parar_monitoramento(self):
         """
-        Interrompe o monitoramento.
+        Interrompe o monitoramento do sistema.
         """
         self.executando = False
