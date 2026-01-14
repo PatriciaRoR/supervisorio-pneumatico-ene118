@@ -103,6 +103,7 @@ class Monitoramento:
         
         # Estes registradores NÃO são monitorados continuamente, 
         # apenas escritos quando o operador realiza uma ação.
+        
         self._controls = {
 
             # Seleção do método de partida
