@@ -50,65 +50,37 @@ class Comunicacao:
         self._lock = threading.Lock()
         self._ultima_atualizacao = 0
 
-    
-    # ENVIO DE DADOS (MONITORAMENTO → KIVY / BD)
-    
+    # ENVIO DE DADOS (BACKEND → UI)
+
     def enviar(self, mensagem: Mensagem):
-        """
-        Envia dados do monitoramento para os demais módulos.
-        """
         with self._lock:
             self._dados = mensagem.to_dict()
             self._ultima_atualizacao = time.time()
 
     def obter_dados(self):
-        """
-        Obtém os últimos dados disponíveis.
-        """
         with self._lock:
             return self._dados.copy()
 
-    def tem_dados_recentes(self, segundos=5):
-        """
-        Verifica se os dados são recentes.
-        """
-        with self._lock:
-            return (time.time() - self._ultima_atualizacao) < segundos
+    # COMANDOS (UI → BACKEND)
 
-    
-    # COMANDOS (KIVY → MONITORAMENTO)
-    
     def enviar_comando(self, comando: dict):
-        """
-        Envia comando para o backend.
-        """
         with self._lock:
             comando["timestamp"] = time.time()
             self._comandos.append(comando)
 
     def obter_proximo_comando(self):
-        """
-        Retorna o próximo comando pendente.
-        """
         with self._lock:
             if self._comandos:
                 return self._comandos.popleft()
         return None
 
-    
-    # CALLBACKS (EVENTOS)
-    
+    # CALLBACKS
+
     def receber(self, tipo, callback):
-        """
-        Registra callback para um tipo de comando.
-        """
         with self._lock:
             self._callbacks[tipo] = callback
 
     def despachar_comandos(self):
-        """
-        Executa callbacks registrados para comandos recebidos.
-        """
         comando = self.obter_proximo_comando()
         if comando:
             tipo = comando.get("acao")
@@ -117,5 +89,4 @@ class Comunicacao:
                 callback(comando)
 
 
-# Instância global
 com = Comunicacao()

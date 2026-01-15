@@ -17,7 +17,8 @@ def iniciar_monitoramento():
     print("\n1. Iniciando monitoramento MODBUS...")
     
 
-    monitor = Monitoramento(ip="10.15.30.182", port=502)
+    monitor = Monitoramento()
+
     
     def loop_monitoramento():
         try:

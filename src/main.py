@@ -1,114 +1,178 @@
-"""
-Main de testes para o módulo Monitoramento.
-Testas individuais para todas as funções do supervisório
-"""
+from __future__ import annotations
 
-import time
+import threading
+
+from kivy.app import App
+from kivy.clock import Clock
+from kivy.lang import Builder
+from kivy.properties import BooleanProperty
+from kivy.uix.screenmanager import ScreenManager, Screen
+
+from comunicacao import com
 from monitoramento import Monitoramento
+from tags import TAGS_PROCESSO, TAGS_ELETRICAS
+from widgets import LinearIndicator, ValveStatus
 
 
-def menu():
-    print("\n================ MENU DE TESTES ================")
-    print("1  - Ler todas as variáveis (1 ciclo)")
-    print("2  - Loop de leitura contínua")
-    print("3  - Selecionar método de partida")
-    print("4  - Ligar motor")
-    print("5  - Desligar motor")
-    print("6  - Resetar motor")
-    print("7  - Ajustar velocidade do motor")
-    print("8  - Abrir válvula")
-    print("9  - Fechar válvula")
-    print("10 - Ajustar PID (P, I, D, SP)")
-    print("0  - Sair")
-    print("================================================")
+# ================= TELAS =================
+
+class RealTimeScreen(Screen):
+    pass
 
 
-def main():
-    print("=== TESTE DO SUPERVISÓRIO - MODBUS TCP ===")
+class MeasurementsScreen(Screen):
+    pass
 
-    ip = input("IP do CLP: ").strip()
-    porta = int(input("Porta Modbus (ex: 502): "))
 
-    mon = Monitoramento(ip=ip, port=porta)
+class CommandsScreen(Screen):
+    pass
 
-    while True:
-        menu()
-        opcao = input("Escolha uma opção: ").strip()
 
-        if opcao == "1":
-            mon.readData()
-            print("\n--- DADOS LIDOS ---")
-            for k, v in mon._meas["values"].items():
-                print(f"{k:25s}: {v}")
+class ElectricalScreen(Screen):
+    pass
 
-        elif opcao == "2":
-            print("Leitura contínua (CTRL+C para parar)")
-            try:
-                while True:
-                    mon.readData()
-                    print("\nTimestamp:", mon._meas["timestamp"])
-                    for k, v in mon._meas["values"].items():
-                        print(f"{k:25s}: {v}")
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("\nLeitura interrompida.")
 
-        elif opcao == "3":
-            print("1 = Soft | 2 = Inversor | 3 = Direta")
-            metodo = int(input("Selecione o método: "))
-            mon.set_metodo_partida(metodo)
-            print("Método de partida enviado.")
+class TrendsScreen(Screen):
+    pass
 
-        elif opcao == "4":
-            mon.ligar_motor(1)
-            print("Comando LIGAR enviado.")
 
-        elif opcao == "5":
-            mon.ligar_motor(0)
-            print("Comando DESLIGAR enviado.")
+class HistoryScreen(Screen):
+    pass
 
-        elif opcao == "6":
-            mon.ligar_motor(2)
-            print("Comando RESET enviado.")
 
-        elif opcao == "7":
-            vel = float(input("Velocidade (ex: 30 Hz): "))
-            mon.set_velocidade(vel)
-            print("Velocidade enviada.")
+# ================= APP =================
 
-        elif opcao == "8":
-            num = int(input("Número da válvula (1 a 6): "))
-            mon.set_valvula(num, True)
-            print(f"Válvula XV{num} ABERTA.")
+class SupervisoryApp(App):
+    is_online = BooleanProperty(False)
 
-        elif opcao == "9":
-            num = int(input("Número da válvula (1 a 6): "))
-            mon.set_valvula(num, False)
-            print(f"Válvula XV{num} FECHADA.")
+    def build(self):
+        Builder.load_file("ui.kv")
 
-        elif opcao == "10":
-            print("Deixe em branco para não alterar.")
-            p = input("P: ")
-            i = input("I: ")
-            d = input("D: ")
-            sp = input("SP: ")
+        sm = ScreenManager()
+        sm.add_widget(RealTimeScreen(name="realtime"))
+        sm.add_widget(MeasurementsScreen(name="medicoes"))
+        sm.add_widget(CommandsScreen(name="comandos"))
+        sm.add_widget(ElectricalScreen(name="eletricas"))
+        sm.add_widget(TrendsScreen(name="trends"))
+        sm.add_widget(HistoryScreen(name="history"))
 
-            params = {}
-            if p: params["p"] = float(p)
-            if i: params["i"] = float(i)
-            if d: params["d"] = float(d)
-            if sp: params["sp"] = float(sp)
+        self.ind_proc = {}
+        self.ind_el = {}
+        self.valves = {}
 
-            mon.set_pid(**params)
-            print("Parâmetros PID enviados.")
+        Clock.schedule_once(self._populate_widgets, 0)
+        Clock.schedule_interval(self._update_from_backend, 0.5)
 
-        elif opcao == "0":
-            print("Encerrando testes.")
-            break
+        return sm
 
-        else:
-            print("Opção inválida.")
+    # ---------- INICIA BACKEND NO MESMO PROCESSO ----------
+    def on_start(self):
+        self.monitor = Monitoramento()
 
+        t = threading.Thread(
+            target=self.monitor.executar_monitoramento,
+            kwargs={"scan_time": 2},
+            daemon=True
+        )
+        t.start()
+
+    # ---------- NAVEGAÇÃO ----------
+    def go_to(self, screen_name: str):
+        if self.root:
+            self.root.current = screen_name
+
+    # ---------- POPULA WIDGETS ----------
+    def _populate_widgets(self, *_):
+        md = self.root.get_screen("medicoes")
+        el = self.root.get_screen("eletricas")
+        cm = self.root.get_screen("comandos")
+
+        for info in TAGS_PROCESSO:
+            w = LinearIndicator(
+                title=info.label,
+                unit=info.unit,
+                vmin=info.vmin,
+                vmax=info.vmax
+            )
+            self.ind_proc[info.tag] = w
+            md.ids.grid_proc.add_widget(w)
+
+        for info in TAGS_ELETRICAS:
+            w = LinearIndicator(
+                title=info.label,
+                unit=info.unit,
+                vmin=info.vmin,
+                vmax=info.vmax
+            )
+            self.ind_el[info.tag] = w
+            el.ids.box_el.add_widget(w)
+
+        for n in range(1, 5):
+            tag = f"co.xv{n}"
+            v = ValveStatus(tag=tag, name=f"XV-{n}")
+            self.valves[tag] = v
+            cm.ids.box_valves.add_widget(v)
+
+    # ---------- RECEBE DADOS DO BACKEND ----------
+    def _update_from_backend(self, *_):
+        msg = com.obter_dados()
+        if not msg:
+            return
+
+        tipo = msg.get("tipo")
+
+        if tipo == "status":
+            self.is_online = msg["dados"]["online"]
+            return
+
+        if tipo == "dados_monitoramento":
+            values = msg["dados"]["values"]
+
+            for tag, val in values.items():
+                if tag in self.ind_proc:
+                    self.ind_proc[tag].set_value(val)
+                elif tag in self.ind_el:
+                    self.ind_el[tag].set_value(val)
+                elif tag in self.valves:
+                    self.valves[tag].set_open(bool(val))
+
+    # ---------- COMANDOS ----------
+    def actuate_motor(self, on: bool):
+        com.enviar_comando({
+            "acao": "motor",
+            "valor": 1 if on else 0
+        })
+
+    def actuate_valve(self, tag: str, open_: bool):
+        numero = int(tag.replace("co.xv", ""))
+        com.enviar_comando({
+            "acao": "valvula",
+            "numero": numero,
+            "aberta": open_
+        })
+
+    def set_start_method(self, metodo: str):
+        mapa = {
+            "Soft-Starter": 1,
+            "Inversor (VFD)": 2,
+            "Direta": 3
+        }
+
+        if metodo in mapa:
+            com.enviar_comando({
+                "acao": "set_driver",
+                "valor": mapa[metodo]
+            })
+
+    def set_speed_setpoint(self, rpm):
+        if str(rpm).isdigit():
+            com.enviar_comando({
+                "acao": "velocidade",
+                "valor": int(rpm)
+            })
+
+
+# ================= MAIN =================
 
 if __name__ == "__main__":
-    main()
+    SupervisoryApp().run()
