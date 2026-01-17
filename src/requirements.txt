@@ -9,7 +9,8 @@ kivy-deps.glew==0.3.1
 Kivy-Garden==0.1.5
 kivy_deps.sdl2==0.8.0
 Pygments==2.19.2
-pyModbusTCP==0.3.0
+# pyModbusTCP==0.3.0
+pyModbusTCP
 pypiwin32==223
 pywin32==311
 requests==2.32.5

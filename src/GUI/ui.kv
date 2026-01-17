@@ -1,0 +1,382 @@
+#:kivy 2.3.1
+#:import dp kivy.metrics.dp
+
+
+# =======================
+# BOTÃO ISA SIMPLES
+# =======================
+
+<ISAButton@Button>:
+    background_normal: ""
+    background_down: ""
+    background_color: 0.88, 0.88, 0.88, 1
+    color: 0.12, 0.12, 0.12, 1
+    font_size: "15sp"
+    bold: True
+
+<ClickableImage@Image>:
+    allow_stretch: True
+    keep_ratio: True
+
+# =======================
+# POPUP DE COMANDO
+# =======================
+
+<CommandPopup>:
+    size_hint: None, None
+    size: dp(420), dp(520)
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(12)
+
+        canvas.before:
+            Color:
+                rgba: 0.96, 0.96, 0.96, 1
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [12]
+
+        Label:
+            text: "COMANDOS DO MOTOR"
+            size_hint_y: None
+            height: dp(36)
+            bold: True
+            font_size: "18sp"
+            color: 0.15, 0.15, 0.15, 1
+
+        ISAButton:
+            text: "RESETAR MOTOR"
+            size_hint_y: None
+            height: dp(46)
+            on_release: app.resetar_motor()
+
+        Label:
+            text: "TIPO DE PARTIDA"
+            size_hint_y: None
+            height: dp(28)
+            bold: True
+            color: 0.2, 0.2, 0.2, 1
+
+        Spinner:
+            id: sp_partida
+            text: "Direta"
+            values: ["Direta", "Inversor", "Soft-Start"]
+            size_hint_y: None
+            height: dp(44)
+            on_text: app.set_tipo_partida(self.text)
+
+        Label:
+            text: "VELOCIDADE (RPM – INVERSOR)"
+            size_hint_y: None
+            height: dp(28)
+            bold: True
+            color: 0.2, 0.2, 0.2, 1
+
+        Slider:
+            id: sl_rpm
+            min: 0
+            max: 3600
+            value: 1800
+            step: 10
+            disabled: sp_partida.text != "Inversor"
+            on_value: lbl_rpm.text = f"{int(self.value)} RPM"; app.atualizar_velocidade(self.value)
+
+        Label:
+            id: lbl_rpm
+            text: "1800 RPM"
+            size_hint_y: None
+            height: dp(24)
+            halign: "center"
+            valign: "middle"
+            text_size: self.size
+
+        ISAButton:
+            text: "ENVIAR SETPOINT"
+            size_hint_y: None
+            height: dp(44)
+            disabled: sp_partida.text != "Inversor"
+            on_release: app.enviar_setpoint(sl_rpm.value)
+
+        ISAButton:
+            text: "FECHAR"
+            size_hint_y: None
+            height: dp(42)
+            on_release: root.dismiss()
+
+# =======================
+# TELA PRINCIPAL
+# =======================
+
+<MainWidget>:
+    pressao: 0.0
+
+    MDFloatLayout:
+        canvas.before:
+            Color:
+                rgba: 0.92, 0.92, 0.92, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        # ================= BARRA SUPERIOR =================
+        MDCard:
+            size_hint: 1, None
+            height: dp(80)
+            pos_hint: {"top": 1}
+            radius: [0, 0, 12, 12]
+            padding: dp(12)
+            spacing: dp(10)
+            md_bg_color: 0.65, 0.65, 0.65, 1
+
+            MDBoxLayout:
+                orientation: "horizontal"
+                spacing: dp(14)
+
+                # -------- TÍTULO --------
+                MDLabel:
+                    text: "SISTEMA SUPERVISÓRIO – COMPRESSOR"
+                    font_style: "H6"
+                    bold: True
+                    halign: "left"
+                    valign: "middle"
+                    size_hint_x: 0.4
+
+                # -------- CARD DE CONEXÃO --------
+                MDCard:
+                    orientation: "horizontal"
+                    spacing: dp(10)
+                    size_hint: None, None
+                    size: dp(315), dp(60)
+                    md_bg_color: 0.93, 0.93, 0.93, 1
+                    radius: [8]
+                    padding: dp(6)
+
+                    MDRaisedButton:
+                        text: "Conectar CLP"
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.conectar_clp()
+
+                    MDRaisedButton:
+                        text: "Desconectar"
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.desconectar_clp()
+
+                    Image:
+                        id: connection_image
+                        source: "images/server_disconnected.png"
+                        size_hint: None, None
+                        size: dp(50), dp(50)
+                        allow_stretch: True
+                        keep_ratio: True
+
+        # -------- SENSOR LINEAR SIMPLIFICADO --------
+        BoxLayout:
+            size_hint: None, None
+            size: dp(260), dp(70)
+            pos_hint: {"center_x": 0.35, "center_y": 0.65}
+            orientation: "vertical"
+            spacing: 0
+
+            MDLabel:
+                text: "Pressão"
+                size_hint_y: None
+                height: dp(20)
+                halign: "left"
+                text_size: self.size
+                color: 0, 0, 0, 1
+
+            BoxLayout:
+                size_hint_y: None
+                height: dp(40)
+                padding: [dp(20), 0, dp(20), 0]
+
+                canvas:
+                    Color:
+                        rgba: 0, 0, 0, 1
+                    Line:
+                        points: self.x, self.center_y, self.right, self.center_y
+                        width: 1.5
+
+        # -------- SENSOR TEXTO --------
+        SensorState:
+            id: pit_01
+            title: "PIT-01"
+            value_text: f"{root.pressao:.2f} bar"
+            pos_hint: {"center_x": 0.35, "center_y": 0.58}
+
+        # -------- PLANTA --------
+        Image:
+            source: "images/planta.png"
+            pos_hint: {"x": 0.10, "y": 0}
+            size_hint: 1, None
+            height: self.parent.height - dp(70)
+            allow_stretch: True
+            keep_ratio: True
+
+        # -------- MOTOR --------
+        ClickableImage:
+            id: motor_1
+            source: "images/motor_off.png"
+            size_hint: None, None
+            size: dp(52), dp(48)
+            pos_hint: {"x": 0.253, "y": 0.383}
+            on_release: app.toggle_motor()
+
+        # -------- VALVULA 1 --------
+        ClickableImage:
+            id: valvula_2
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.883, "y": 0.489}
+            on_release: app.toggle_valvula("valvula_2")
+
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+
+        # -------- VALVULA 2 --------
+        ClickableImage:
+            id: valvula_3
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.883, "y": 0.36}
+            on_release: app.toggle_valvula("valvula_3")
+
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+
+        # -------- VALVULA 3 --------
+        ClickableImage:
+            id: valvula_4
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.883, "y": 0.23}
+            on_release: app.toggle_valvula("valvula_4")
+
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+
+        # ================= MENU LATERAL =================
+        MDCard:
+            size_hint: None, None
+            size: dp(180), dp(230)
+            pos_hint: {"x": 0.02, "y": 0.02}
+            radius: [8]
+            padding: dp(12)
+            md_bg_color: 0.94, 0.94, 0.94, 1
+            elevation: 3
+
+            MDGridLayout:
+                cols: 2
+                spacing: [dp(8), dp(4)]
+                padding: dp(6)
+                size_hint_y: None
+                height: self.minimum_height
+                row_force_default: True
+                row_default_height: dp(40)
+                col_force_default: True
+                col_default_width: dp(70)
+
+                MDLabel:
+                    text: "VELOC."
+                    halign: "center"
+                    valign: "middle"
+
+                MDLabel:
+                    id: lbl_vel
+                    text: "0 RPM"
+                    halign: "center"
+                    valign: "middle"
+
+                MDLabel:
+                    text: "TORQUE"
+                    halign: "center"
+                    valign: "middle"
+
+                MDLabel:
+                    text: "0.0 N·m"
+                    halign: "center"
+                    valign: "middle"
+
+                MDRaisedButton:
+                    text: "COMANDO"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_menu_comando()
+
+                MDRaisedButton:
+                    text: "GRÁFICO"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_grafico()
+
+                MDRaisedButton:
+                    text: "MEDIÇÕES"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_medicoes()
+
+                MDRaisedButton:
+                    text: "TEMP."
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_temperaturas()
+
+                MDRaisedButton:
+                    text: "BD"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_banco_dados()
+
+                MDRaisedButton:
+                    text: "PID"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_pid()
+
+MainWidget:

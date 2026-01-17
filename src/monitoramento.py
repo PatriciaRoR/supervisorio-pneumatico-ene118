@@ -8,15 +8,19 @@ Responsabilidades deste módulo:
 - Comunicação com a interface gráfica (Kivy) e com o banco de dados
 """
 
+from comunicacao import com, Mensagem
 import time
 import struct
+# from pymodbus.client import ModbusTcpClient
 from pyModbusTCP.client import ModbusClient
+
+from pymodbus.client import ModbusTcpClient
+
 import logging
 
 logging.getLogger("pyModbusTCP").setLevel(logging.WARNING)
 
 # Ponte de comunicação entre módulos (Thread-safe)
-from comunicacao import com, Mensagem
 
 
 class Monitoramento:
@@ -137,8 +141,10 @@ class Monitoramento:
 
         # Estrutura interna de medições
         self._meas = {
-            "timestamp": None,  # Reserva um espaço para guardar o instante da última leitura.
-            "values": {}        # Começa vazio porque ainda não realizou leitura.
+            # Reserva um espaço para guardar o instante da última leitura.
+            "timestamp": None,
+            # Começa vazio porque ainda não realizou leitura.
+            "values": {}
         }
 
         # 3. INICIALIZAÇÃO DO CLIENTE MODBUS
@@ -147,8 +153,9 @@ class Monitoramento:
             host=self.ip,
             port=self.port,
             auto_open=True,
-            auto_close=False
+            auto_close=False,
         )
+        # self.client.connect()
 
         # 4. REGISTRO DE COMANDOS DA INTERFACE
 
@@ -161,7 +168,6 @@ class Monitoramento:
         com.receber("pid", self._processar_comando_kivy)
 
         self._online = False
-    
 
     # 5. FUNÇÕES DE LEITURA MODBUS
 
@@ -171,16 +177,16 @@ class Monitoramento:
         para float IEEE 754 (32 bits).
         """
         regs = self.client.read_holding_registers(addr, 2)
-        if regs and len(regs) == 2:
-            return struct.unpack(">f", struct.pack(">HH", regs[0], regs[1]))[0]
-        return None
+        val = ModbusTcpClient.convert_from_registers(
+            regs, ModbusTcpClient.DATATYPE.FLOAT32, word_order='little')
+        return val
 
     def _read_bit(self, addr, bit):
         """
         Lê um bit específico dentro de um registrador.
         Utilizado para leitura do estado das válvulas.
         """
-        reg = self.client.read_holding_registers(addr, 1)
+        reg = self.client.read_holding_registers(addr)
         if reg:
             return (reg[0] >> bit) & 1
         return None
@@ -208,7 +214,8 @@ class Monitoramento:
                 elif cfg["type"] == "BIT":
                     valor = self._read_bit(cfg["addr"], cfg["bit"])
                 else:  # 4X padrão
-                    reg = self.client.read_holding_registers(cfg["addr"], 1)
+                    reg = self.client.read_holding_registers(
+                        cfg["addr"], 1)
                     valor = reg[0] if reg else None
 
                 # Aplica fator de escala, se existir
@@ -259,11 +266,14 @@ class Monitoramento:
         Envia comando de atuação ao motor.
         """
         if self._ultimo_driver == 1:
-            self.client.write_single_register(self._controls["soft"]["addr"], comando)
+            self.client.write_single_register(
+                self._controls["soft"]["addr"], comando)
         elif self._ultimo_driver == 2:
-            self.client.write_single_register(self._controls["inversor"]["addr"], comando)
+            self.client.write_single_register(
+                self._controls["inversor"]["addr"], comando)
         elif self._ultimo_driver == 3:
-            self.client.write_single_register(self._controls["direta"]["addr"], comando)
+            self.client.write_single_register(
+                self._controls["direta"]["addr"], comando)
 
     def set_velocidade(self, valor):
         """
@@ -301,7 +311,9 @@ class Monitoramento:
         Escreve um valor float IEEE 754 (32 bits)
         em dois registradores consecutivos do CLP.
         """
-        regs = struct.unpack(">HH", struct.pack(">f", float(valor)))
+        # regs = struct.unpack(">HH", struct.pack(">f", float(valor)))
+        regs = ModbusTcpClient.convert_to_registers(
+            float(valor), ModbusTcpClient.DATATYPE.FLOAT32, word_order='little')
         self.client.write_multiple_registers(addr, list(regs))
 
     def set_pid(self, p=None, i=None, d=None, sp=None, mv=None):
@@ -327,7 +339,7 @@ class Monitoramento:
         e executa a ação correspondente no CLP.
         """
         print("COMANDO RECEBIDO:", comando)
-        
+
         acao = comando.get("acao")
 
         if acao == "set_driver":
@@ -347,8 +359,6 @@ class Monitoramento:
 
         elif acao == "pid":
             self.set_pid(**comando["parametros"])
-    
-
 
     def executar_monitoramento(self, scan_time=2):
         while True:

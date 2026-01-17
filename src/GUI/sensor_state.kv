@@ -1,0 +1,50 @@
+#:kivy 2.3.1
+#:import dp kivy.metrics.dp
+
+
+<LinearGauge>:
+    size_hint: None, None
+    size: dp(260), dp(70)
+
+    canvas:
+        Color:
+            rgba: 0, 0, 0, 1
+
+        Line:
+            width: 1.5
+            points: [self.x + dp(20), self.y + dp(20), self.x + self.width - dp(20), self.y + dp(20)]
+
+        Triangle:
+            points: [root.pointer_x, self.y + dp(26), root.pointer_x - dp(6), self.y + dp(38), root.pointer_x + dp(6), self.y + dp(38)]
+
+    MDLabel:
+        text: root.label
+        size_hint: None, None
+        size: self.width, dp(20)
+        pos: self.x, self.top
+        halign: "left"
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1
+
+
+<SensorState@MDBoxLayout>:
+    orientation: "vertical"
+    size_hint: None, None
+    size: dp(120), dp(36)
+
+    title: ""
+    value_text: ""
+
+    MDLabel:
+        text: root.title
+        font_style: "Caption"
+        halign: "center"
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1
+
+    MDLabel:
+        text: root.value_text
+        font_style: "Body2"
+        halign: "center"
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1

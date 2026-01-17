@@ -1,178 +1,225 @@
-from __future__ import annotations
-
-import threading
-
-from kivy.app import App
-from kivy.clock import Clock
+from kivymd.app import MDApp
 from kivy.lang import Builder
-from kivy.properties import BooleanProperty
-from kivy.uix.screenmanager import ScreenManager, Screen
-
+from kivy.uix.modalview import ModalView
+from kivymd.uix.floatlayout import MDFloatLayout
+from kivy.uix.image import Image
+from kivy.uix.behaviors import ButtonBehavior
+from kivy.properties import NumericProperty
+from kivy.clock import Clock
 from comunicacao import com
-from monitoramento import Monitoramento
-from tags import TAGS_PROCESSO, TAGS_ELETRICAS
-from widgets import LinearIndicator, ValveStatus
+import random
 
 
-# ================= TELAS =================
+# =====================================================
+# COMPONENTES VISUAIS
+# =====================================================
 
-class RealTimeScreen(Screen):
+class ClickableImage(ButtonBehavior, Image):
     pass
 
 
-class MeasurementsScreen(Screen):
+class CommandPopup(ModalView):
     pass
 
 
-class CommandsScreen(Screen):
-    pass
+class MainWidget(MDFloatLayout):
+    """
+    Widget raiz da interface.
+    """
+    water_level = NumericProperty(0)
+    pressao = NumericProperty(0.0)  # Propriedade para a pressão
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Inicializa variáveis para válvulas
+        self._valvula_2 = False
+        self._valvula_3 = False
+        self._valvula_4 = False
+
+    def on_kv_post(self, base_widget):
+        # Inicia a simulação
+        Clock.schedule_interval(self.simular, 1)
+
+    def simular(self, dt):
+        # Simula dados aleatórios
+        self.pressao = random.uniform(0.5, 5.0)
+        # Atualiza o texto do sensor
+        if hasattr(self.ids, 'pit_01'):
+            self.ids.pit_01.value_text = f"{self.pressao:.2f} bar"
+        
+        # Atualiza o ponteiro do gauge (se existir)
+        if hasattr(self.ids, 'pressao_gauge'):
+            # Calcula posição do ponteiro baseado na pressão
+            min_val = 0.0
+            max_val = 10.0
+            normalized = (self.pressao - min_val) / (max_val - min_val)
+            # Limita entre 0 e 1
+            normalized = max(0.0, min(1.0, normalized))
+            # Atualiza propriedade do gauge
+            self.ids.pressao_gauge.value = normalized
+
+    def abrir_menu_comando(self):
+        MDApp.get_running_app().abrir_comando()
+
+    def abrir_grafico(self):
+        print("📈 Abrir gráfico")
+
+    def abrir_medicoes(self):
+        print("📊 Abrir medições")
+
+    def abrir_temperaturas(self):
+        print("🌡️ Abrir temperaturas")
+
+    def abrir_banco_dados(self):
+        print("🗄️ Abrir banco de dados")
+
+    def abrir_pid(self):
+        print("🎛️ Abrir PID")
+
+    def conectar_clp(self):
+        print("🔌 Conectando ao CLP...")
+        # Nota: No seu .kv, não tem status_conexao, então removi essas linhas
+        # self.ids.status_conexao.text = "ONLINE"
+        # self.ids.status_conexao.theme_text_color = "Custom"
+        # self.ids.status_conexao.text_color = (0.12, 0.62, 0.22, 1)
+        self.ids.connection_image.source = "images/server_connected.png"
+
+    def desconectar_clp(self):
+        print("❌ Desconectando do CLP...")
+        # Nota: No seu .kv, não tem status_conexao, então removi essas linhas
+        # self.ids.status_conexao.text = "DESCONECTADO"
+        # self.ids.status_conexao.theme_text_color = "Error"
+        self.ids.connection_image.source = "images/server_disconnected.png"
 
 
-class ElectricalScreen(Screen):
-    pass
+# =====================================================
+# APLICAÇÃO PRINCIPAL
+# =====================================================
 
+class SupervisoryApp(MDApp):
 
-class TrendsScreen(Screen):
-    pass
-
-
-class HistoryScreen(Screen):
-    pass
-
-
-# ================= APP =================
-
-class SupervisoryApp(App):
-    is_online = BooleanProperty(False)
+    motor_ligado = False
 
     def build(self):
-        Builder.load_file("ui.kv")
+        print("✅ UI iniciada")
+        
+        # ORDEM IMPORTA - carrega primeiro o sensor_state.kv
+        try:
+            Builder.load_file("GUI/sensor_state.kv")
+            Builder.load_file("GUI/ui.kv")
+            print("✅ Arquivos .kv carregados com sucesso")
+        except Exception as e:
+            print(f"❌ Erro ao carregar arquivos .kv: {e}")
+            # Cria um widget básico em caso de erro
+            return MainWidget()
+        
+        return MainWidget()
 
-        sm = ScreenManager()
-        sm.add_widget(RealTimeScreen(name="realtime"))
-        sm.add_widget(MeasurementsScreen(name="medicoes"))
-        sm.add_widget(CommandsScreen(name="comandos"))
-        sm.add_widget(ElectricalScreen(name="eletricas"))
-        sm.add_widget(TrendsScreen(name="trends"))
-        sm.add_widget(HistoryScreen(name="history"))
+    def abrir_comando(self):
+        print("🪟 Abrindo popup de comando")
+        popup = CommandPopup()
+        popup.open()
 
-        self.ind_proc = {}
-        self.ind_el = {}
-        self.valves = {}
+    # ================= MOTOR =================
 
-        Clock.schedule_once(self._populate_widgets, 0)
-        Clock.schedule_interval(self._update_from_backend, 0.5)
+    def toggle_motor(self):
+        motor_img = self.root.ids.motor_1
 
-        return sm
+        if not self.motor_ligado:
+            print("🔁 LIGAR MOTOR")
+            self._enviar_motor(1)
+            motor_img.source = "images/motor_on.png"
+            self.motor_ligado = True
+        else:
+            print("🔁 DESLIGAR MOTOR")
+            self._enviar_motor(0)
+            motor_img.source = "images/motor_off.png"
+            self.motor_ligado = False
 
-    # ---------- INICIA BACKEND NO MESMO PROCESSO ----------
-    def on_start(self):
-        self.monitor = Monitoramento()
+    def resetar_motor(self):
+        print("🔄 RESET MOTOR")
+        self._enviar_motor(2)
 
-        t = threading.Thread(
-            target=self.monitor.executar_monitoramento,
-            kwargs={"scan_time": 2},
-            daemon=True
-        )
-        t.start()
-
-    # ---------- NAVEGAÇÃO ----------
-    def go_to(self, screen_name: str):
-        if self.root:
-            self.root.current = screen_name
-
-    # ---------- POPULA WIDGETS ----------
-    def _populate_widgets(self, *_):
-        md = self.root.get_screen("medicoes")
-        el = self.root.get_screen("eletricas")
-        cm = self.root.get_screen("comandos")
-
-        for info in TAGS_PROCESSO:
-            w = LinearIndicator(
-                title=info.label,
-                unit=info.unit,
-                vmin=info.vmin,
-                vmax=info.vmax
-            )
-            self.ind_proc[info.tag] = w
-            md.ids.grid_proc.add_widget(w)
-
-        for info in TAGS_ELETRICAS:
-            w = LinearIndicator(
-                title=info.label,
-                unit=info.unit,
-                vmin=info.vmin,
-                vmax=info.vmax
-            )
-            self.ind_el[info.tag] = w
-            el.ids.box_el.add_widget(w)
-
-        for n in range(1, 5):
-            tag = f"co.xv{n}"
-            v = ValveStatus(tag=tag, name=f"XV-{n}")
-            self.valves[tag] = v
-            cm.ids.box_valves.add_widget(v)
-
-    # ---------- RECEBE DADOS DO BACKEND ----------
-    def _update_from_backend(self, *_):
-        msg = com.obter_dados()
-        if not msg:
-            return
-
-        tipo = msg.get("tipo")
-
-        if tipo == "status":
-            self.is_online = msg["dados"]["online"]
-            return
-
-        if tipo == "dados_monitoramento":
-            values = msg["dados"]["values"]
-
-            for tag, val in values.items():
-                if tag in self.ind_proc:
-                    self.ind_proc[tag].set_value(val)
-                elif tag in self.ind_el:
-                    self.ind_el[tag].set_value(val)
-                elif tag in self.valves:
-                    self.valves[tag].set_open(bool(val))
-
-    # ---------- COMANDOS ----------
-    def actuate_motor(self, on: bool):
-        com.enviar_comando({
-            "acao": "motor",
-            "valor": 1 if on else 0
-        })
-
-    def actuate_valve(self, tag: str, open_: bool):
-        numero = int(tag.replace("co.xv", ""))
-        com.enviar_comando({
-            "acao": "valvula",
-            "numero": numero,
-            "aberta": open_
-        })
-
-    def set_start_method(self, metodo: str):
-        mapa = {
-            "Soft-Starter": 1,
-            "Inversor (VFD)": 2,
-            "Direta": 3
-        }
-
-        if metodo in mapa:
+    def _enviar_motor(self, valor):
+        # Verifica se o módulo de comunicação existe
+        try:
             com.enviar_comando({
-                "acao": "set_driver",
-                "valor": mapa[metodo]
+                "acao": "motor",
+                "valor": valor
             })
+        except Exception as e:
+            print(f"⚠️ Erro ao enviar comando do motor: {e}")
 
-    def set_speed_setpoint(self, rpm):
-        if str(rpm).isdigit():
+    # ================= PARTIDA =================
+
+    def set_tipo_partida(self, tipo):
+        mapa = {"Soft-Start": 1, "Inversor": 2, "Direta": 3}
+        valor = mapa.get(tipo)
+
+        if valor:
+            try:
+                com.enviar_comando({
+                    "acao": "set_driver",
+                    "valor": valor
+                })
+            except Exception as e:
+                print(f"⚠️ Erro ao definir tipo de partida: {e}")
+
+    def atualizar_velocidade(self, valor):
+        # Método chamado pelo slider no popup
+        print(f"🎚️ Velocidade atualizada: {valor} RPM")
+        # Atualiza o label no menu lateral em tempo real
+        self.root.ids.lbl_vel.text = f"{int(valor)} RPM"
+
+    # ================= VELOCIDADE =================
+
+    def enviar_setpoint(self, rpm):
+        rpm = int(rpm)
+        try:
             com.enviar_comando({
                 "acao": "velocidade",
-                "valor": int(rpm)
+                "valor": rpm
             })
+            print(f"✅ Setpoint enviado: {rpm} RPM")
+            self.root.ids.lbl_vel.text = f"{rpm} RPM"
+        except Exception as e:
+            print(f"⚠️ Erro ao enviar setpoint: {e}")
+
+    # ================= VÁLVULAS =================
+
+    def toggle_valvula(self, nome):
+        try:
+            numero = int(nome.split("_")[1])
+            # Obtém o estado atual da válvula
+            estado_atual = getattr(self, f"_valvula_{numero}", False)
+            novo_estado = not estado_atual
+            
+            # Atualiza o estado
+            setattr(self, f"_valvula_{numero}", novo_estado)
+            
+            # Envia comando
+            com.enviar_comando({
+                "acao": "valvula",
+                "numero": numero,
+                "aberta": novo_estado
+            })
+            
+            # Atualiza a imagem
+            img = self.root.ids[nome]
+            if novo_estado:
+                img.source = "images/valve_on.png"
+                print(f"✅ Válvula {numero} ABERTA")
+            else:
+                img.source = "images/valve_off.png"
+                print(f"✅ Válvula {numero} FECHADA")
+                
+        except Exception as e:
+            print(f"⚠️ Erro ao alternar válvula: {e}")
 
 
-# ================= MAIN =================
+# =====================================================
+# MAIN
+# =====================================================
 
 if __name__ == "__main__":
     SupervisoryApp().run()
