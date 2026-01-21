@@ -8,16 +8,16 @@ from Core.monitoramento import Monitoramento
 
 class SupervisoryApp(MDApp):
     def build(self):
-        print("✅ UI iniciada")
+        print("UI iniciada")
 
-        # 🔹 Carrega TODOS os KV (sem criar root aqui)
+        #  Carrega TODOS os KV (sem criar root aqui)
         Builder.load_file("GUI/conexao.kv")
         Builder.load_file("GUI/comando.kv")
         Builder.load_file("GUI/RealTimeGraph.kv")
         Builder.load_file("GUI/medicoes.kv")
-        Builder.load_file("GUI/main.kv")   # ⚠️ IMPORTANTE: carregar o KV do MainWidget
+        Builder.load_file("GUI/main.kv")   #  IMPORTANTE: carregar o KV do MainWidget
 
-        # 🔧 Backend criado UMA ÚNICA VEZ
+        #  Backend criado UMA ÚNICA VEZ
         self.monitoramento = Monitoramento()
 
         Thread(
@@ -25,7 +25,7 @@ class SupervisoryApp(MDApp):
             daemon=True
         ).start()
 
-        # 🔧 Root criado PELO PYTHON (não pelo KV)
+        #  Root criado PELO PYTHON (não pelo KV)
         root = MainWidget(self.monitoramento)
 
         return root
