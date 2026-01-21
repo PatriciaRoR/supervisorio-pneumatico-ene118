@@ -74,7 +74,7 @@ class Monitoramento:
 
             # VARIÁVEIS DE PROCESSO
             "co.pressao": {"addr": 714, "type": "FP", "div": 1},
-            "co.fit03":   {"addr": 718, "type": "FP", "div": 1},
+            "co.fit03":   {"addr": 716, "type": "FP", "div": 1},
 
             # PID
             # PV = variável de processo
