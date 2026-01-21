@@ -10,7 +10,6 @@ Responsabilidades deste módulo:
 
 import time
 import struct
-# from pymodbus.client import ModbusTcpClient
 from pyModbusTCP.client import ModbusClient
 from pymodbus.client import ModbusTcpClient
 import logging
@@ -168,8 +167,8 @@ class Monitoramento:
         self.client = ModbusClient(
             host=self.ip,
             port=self.port,
-            auto_open=False,
-            auto_close=False,
+            auto_open=False, #Você controla quando a conexão é aberta
+            auto_close=False, #A conexão permanece aberta
         )
         self.client.open()
 
@@ -180,10 +179,10 @@ class Monitoramento:
         Lê dois registradores consecutivos e converte
         para float IEEE 754 (32 bits).
         """
-        regs = self.client.read_holding_registers(addr, 2)
-        val = ModbusTcpClient.convert_from_registers(
-            regs, ModbusTcpClient.DATATYPE.FLOAT32, word_order='little')
-        return val
+        regs = self.client.read_holding_registers(addr, 2)  #Função Modbus padrão
+        val = ModbusTcpClient.convert_from_registers(   #Recebe registradores Modbus
+            regs, ModbusTcpClient.DATATYPE.FLOAT32, word_order='little')  ## Interpreta como tipo numérico
+        return val  #retorna valor python
 
     def _read_bit(self, addr, bit):
         """
@@ -191,9 +190,9 @@ class Monitoramento:
         Utilizado para leitura do estado das válvulas.
         """
         reg = self.client.read_holding_registers(addr)
-        if reg:
-            return (reg[0] >> bit) & 1
-        return None
+        if reg:  # Antes de acessar o valor, eu verifico se a leitura foi bem-sucedida.
+            return (reg[0] >> bit) & 1 #desloco um bit ate a posição menos significativa e garanto retorno 0 ou 1
+        return None #Evita confundir erro com 0 (válvula fechada)
 
     # 6. LEITURA DAS VARIÁVEIS DO PROCESSO
 
@@ -206,10 +205,10 @@ class Monitoramento:
         por uma thread externa.
         """
 
-        self._meas["timestamp"] = time.time()
-        self._meas["values"] = {}
-        with self._lock:
-            for nome, cfg in self._tags.items():
+        self._meas["timestamp"] = time.time() #Cada ciclo de leitura é associado a um timestamp.
+        self._meas["values"] = {} #Cada ciclo reflita somente valores atuais
+        with self._lock: #O Lock garante integridade da comunicação Modbus durante o ciclo de leitura.
+            for nome, cfg in self._tags.items(): #Percorre todo o mapa de memória
                 try:
                     # Leitura conforme o tipo
                     if cfg["type"] == "FP":
@@ -223,19 +222,10 @@ class Monitoramento:
 
                     # Aplica fator de escala
                     if valor is not None:
-                        self._meas["values"][nome] = valor / cfg.get("div", 1)
+                        self._meas["values"][nome] = valor / cfg.get("div", 1)  #Converte valor bruto para unidade de engenharia.
 
                 except Exception as e:
                     print(f"⚠️ Erro Modbus ({nome}): {e}")
-        # print(self._meas)
-
-        # # 🔽 Comunicação SIMPLIFICADA
-        # try:
-        #     # Envia direto os dados para quem estiver ouvindo (UI)
-        #     com.enviar("dados_monitoramento", self._meas.copy())
-
-        # except Exception as e:
-        #     print(f"⚠️ Erro ao enviar dados: {e}")
 
 
     # 7. ATUAÇÃO E CONTROLE DO PROCESSO
@@ -244,14 +234,15 @@ class Monitoramento:
         """
         Seleciona o tipo de partida do motor.
         """
-        with self._lock:
-            self.client.write_single_register(self._controls["sel_driver"]["addr"], metodo )
+        with self._lock: # O Lock garante que a escrita no CLP não conflite com leituras simultâneas.
+            self.client.write_single_register(self._controls["sel_driver"]["addr"], metodo ) #Busca o endereço configurado no mapa de controle
+
 
     def ligar_motor(self):
         with self._lock:
 
             try: 
-                tipo_partida = self._meas["values"].get("co.indica_driver")
+                tipo_partida = self._meas["values"].get("co.indica_driver") #O comando se baseia no estado real informado pelo CLP.
 
                 if tipo_partida == 1:  # Soft-Start
                     is_active = self.client.read_holding_registers(886, 1)[0]

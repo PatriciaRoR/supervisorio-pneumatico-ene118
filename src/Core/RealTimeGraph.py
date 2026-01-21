@@ -12,13 +12,13 @@ class RealTimeGraphContent(MDBoxLayout):
 
 
 class RealTimeGraphPopup(ModalView):
-
+    
     def __init__(self, main_widget, name, var, unit, max_value=1, **kwargs):
         super().__init__(
             size_hint=(None, None),
             size=(940, 680),
             auto_dismiss=False,
-            **kwargs
+            **kwargs   #Evita fechamento acidental
         )
 
         # 🔹 parâmetros

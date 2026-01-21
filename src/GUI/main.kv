@@ -451,8 +451,9 @@
                     md_bg_color: 0.85, 0.85, 0.85, 1
                     text_color: 0, 0, 0, 1
                     elevation: 1
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
                     on_release: root.abrir_menu_comando()
-
+                         
                 MDRaisedButton:
                     text: "MEDIÇÕES"
                     size_hint: None, None
@@ -461,7 +462,9 @@
                     md_bg_color: 0.85, 0.85, 0.85, 1
                     text_color: 0, 0, 0, 1
                     elevation: 1
+                    pos_hint: {"center_x": 0.5, "center_y": 0.2}
                     on_release: root.abrir_medicoes()
+                    
 
                 MainButton:
                     id: scan_time_button
