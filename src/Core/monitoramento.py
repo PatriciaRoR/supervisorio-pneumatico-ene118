@@ -225,7 +225,7 @@ class Monitoramento:
                         self._meas["values"][nome] = valor / cfg.get("div", 1)  #Converte valor bruto para unidade de engenharia.
 
                 except Exception as e:
-                    print(f"⚠️ Erro Modbus ({nome}): {e}")
+                    print(f"Erro Modbus ({nome}): {e}")
 
 
     # 7. ATUAÇÃO E CONTROLE DO PROCESSO
@@ -344,5 +344,5 @@ class Monitoramento:
                 else:
                     print("cliente fechado")
             except Exception as e:
-                print(f"⚠️ Erro no monitoramento: {e}")
+                print(f" Erro no monitoramento: {e}")
             time.sleep(scan_time)
