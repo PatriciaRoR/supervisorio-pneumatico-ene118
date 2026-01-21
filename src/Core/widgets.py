@@ -197,7 +197,7 @@ class MainWidget(MDFloatLayout):
         if tipo in mapa:
             self.tipo_partida = tipo
             self.monitoramento.set_metodo_partida(mapa[tipo])
-            print(f"🟦 [UI] Tipo de partida selecionado: {tipo} ({mapa[tipo]})")
+            print(f" Tipo de partida selecionado: {tipo} ({mapa[tipo]})")
 
     def enviar_setpoint(self, valor):
         self.velocidade_setpoint = int(valor)
@@ -235,7 +235,7 @@ class MainWidget(MDFloatLayout):
             popup = CommandPopup(main_widget=self)
             popup.open()
         except Exception as e:
-            print(f"⚠️ Erro ao abrir menu de comando: {e}")
+            print(f"Erro ao abrir menu de comando: {e}")
     
     def abrir_popup_conexao(self):
         from Core.connect import ConnectDialog
@@ -252,7 +252,7 @@ class MainWidget(MDFloatLayout):
         """
         self.velocidade_setpoint = int(valor)
 
-        print(f"🎚️ [UI] Velocidade ajustada: {int(valor)} RPM")
+        print(f"Velocidade ajustada: {int(valor)} RPM")
 
         # Atualiza label do popup, se existir
         try:
@@ -267,4 +267,4 @@ class MainWidget(MDFloatLayout):
         Stub seguro para botão de desconexão.
         Não faz nada por enquanto.
         """
-        print("🔌 [UI] Desconectar CLP (não implementado ainda)")
+        print("[UI] Desconectar CLP (não implementado ainda)")
