@@ -1,0 +1,58 @@
+#:kivy 2.3.1
+
+<DbSearchContent>:
+    orientation: 'vertical'
+    spacing: dp(15)
+    padding: dp(20)
+    size_hint_y: None
+    height: dp(400)
+
+    MDBoxLayout:
+        orientation: 'horizontal'
+        size_hint_y: .7
+        spacing: dp(10)
+
+        MDTextField:
+            id: time_stamp_inicial
+            hint_text: "Tempo Inicial"
+            text: ""
+            helper_text: "DD/MM/AAAA HH:MM:SS"
+            max_text_length: 19
+            helper_text_mode: "persistent"
+        
+        MDTextField:
+            id: time_stamp_final
+            hint_text: "Tempo Final"
+            text: ""
+            helper_text: "DD/MM/AAAA HH:MM:SS"
+            max_text_length: 19
+            helper_text_mode: "persistent"
+
+    ScrollView:
+        id: painel_scroll
+        do_scroll_x: False
+        do_scroll_y: True
+        size_hint: (1, None)
+        height: dp(200)
+        pos_hint: {"center_x": 0.5}
+
+        BoxLayout:
+            id: painel_container
+            orientation: 'vertical'
+            size_hint_y: None
+            height: self.minimum_height
+
+    MDLabel:
+        id: error_label
+        text: "Informações ausentes para busca"
+        theme_text_color: "Error"
+        opacity: 0  
+        halign: "center"
+
+    MDRaisedButton:
+        id: search_button
+        text: "Buscar"
+        md_bg_color: 0.776, 0.776, 0.776, 1
+        text_color: 0, 0, 0, 1
+        pos_hint: {"center_x": 0.5}
+        on_release: root.handle_button(self, "db_search")

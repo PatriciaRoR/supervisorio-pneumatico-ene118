@@ -8,15 +8,14 @@ Responsabilidades deste módulo:
 - Comunicação com a interface gráfica (Kivy) e com o banco de dados
 """
 
-from comunicacao import com, Mensagem
 import time
 import struct
 # from pymodbus.client import ModbusTcpClient
 from pyModbusTCP.client import ModbusClient
-
 from pymodbus.client import ModbusTcpClient
-
 import logging
+from threading import Lock
+
 
 logging.getLogger("pyModbusTCP").setLevel(logging.WARNING)
 
@@ -40,10 +39,11 @@ class Monitoramento:
         - O mapa de memória do CLP (tags)
         - As variáveis de controle
         - O cliente Modbus
-        - O registro de callbacks de comandos
         """
         self.ip = "10.15.30.182"
         self.port = 502
+
+        self._lock = Lock()
 
         # 1. MAPA DE MEMÓRIA DO CLP (TAGS DE MONITORAMENTO)
 
@@ -59,6 +59,7 @@ class Monitoramento:
 
             # ESTADOS GERAIS E PARTIDA
             "co.sel_driver":  {"addr": 1324, "type": "4X", "div": 1},
+            "co.indica_driver":  {"addr": 1324, "type": "4X", "div": 1},
             "co.habilita":    {"addr": 1328, "type": "4X", "div": 1},
             "co.seg_manauto": {"addr": 1330, "type": "4X", "div": 1},
 
@@ -66,7 +67,6 @@ class Monitoramento:
 
             # Todas as válvulas estão compactadas em um único registrador
             # Cada bit representa o estado de uma válvula
-            "co.xv1": {"addr": 712, "bit": 0, "type": "BIT"},
             "co.xv2": {"addr": 712, "bit": 1, "type": "BIT"},
             "co.xv3": {"addr": 712, "bit": 2, "type": "BIT"},
             "co.xv4": {"addr": 712, "bit": 3, "type": "BIT"},
@@ -75,7 +75,6 @@ class Monitoramento:
 
             # VARIÁVEIS DE PROCESSO
             "co.pressao": {"addr": 714, "type": "FP", "div": 1},
-            "co.fit02":   {"addr": 716, "type": "FP", "div": 1},
             "co.fit03":   {"addr": 718, "type": "FP", "div": 1},
 
             # PID
@@ -95,16 +94,33 @@ class Monitoramento:
             "co.encoder": {"addr": 884,  "type": "FP", "div": 1},
             "co.torque":  {"addr": 1420, "type": "FP", "div": 1},
 
-            # GRANDEZAS ELÉTRICAS
+            # CORRENTES
             "co.corrente_r": {"addr": 840, "type": "4X", "div": 10},
             "co.corrente_s": {"addr": 841, "type": "4X", "div": 10},
             "co.corrente_t": {"addr": 842, "type": "4X", "div": 10},
+            "co.corrente_n": {"addr": 843, "type": "4X", "div": 10},
+            "co.corrente_media": {"addr": 845, "type": "4X", "div": 10},
 
+            # TENSÕES
             "co.tensao_rs": {"addr": 847, "type": "4X", "div": 10},
             "co.tensao_st": {"addr": 848, "type": "4X", "div": 10},
             "co.tensao_tr": {"addr": 849, "type": "4X", "div": 10},
-
             "co.ativa_total": {"addr": 855, "type": "4X", "div": 1},
+
+            # FATOR DE POTÊNCIA
+            "co.fp_r": {"addr": 868, "type": "4X", "div": 1000},
+            "co.fp_s": {"addr": 869, "type": "4X", "div": 1000},
+            "co.fp_t": {"addr": 870, "type": "4X", "div": 1000},
+            "co.fp_total": {"addr": 871, "type": "4X", "div": 1000},
+            # THD
+            "co.thd_tensao_rs": {"addr": 804, "type": "4X", "div": 10},
+            "co.thd_tensao_st": {"addr": 805, "type": "4X", "div": 10},
+            "co.thd_tensao_tr": {"addr": 806, "type": "4X", "div": 10},
+            "co.thd_corrente_r": {"addr": 874, "type": "4X", "div": 10},
+            "co.thd_corrente_s": {"addr": 875, "type": "4X", "div": 10},
+            "co.thd_corrente_t": {"addr": 876, "type": "4X", "div": 10},
+            "co.thd_corrente_n": {"addr": 877, "type": "4X", "div": 10},
+
         }
 
         # 2. MAPA DE ATUAÇÃO (COMANDOS DE ESCRITA NO CLP)
@@ -152,22 +168,10 @@ class Monitoramento:
         self.client = ModbusClient(
             host=self.ip,
             port=self.port,
-            auto_open=True,
+            auto_open=False,
             auto_close=False,
         )
-        # self.client.connect()
-
-        # 4. REGISTRO DE COMANDOS DA INTERFACE
-
-        # A interface gráfica envia comandos através da ponte de comunicação.
-        # Aqui registramos o callback.
-        com.receber("motor", self._processar_comando_kivy)
-        com.receber("set_driver", self._processar_comando_kivy)
-        com.receber("velocidade", self._processar_comando_kivy)
-        com.receber("valvula", self._processar_comando_kivy)
-        com.receber("pid", self._processar_comando_kivy)
-
-        self._online = False
+        self.client.open()
 
     # 5. FUNÇÕES DE LEITURA MODBUS
 
@@ -199,56 +203,40 @@ class Monitoramento:
         no mapa de memória do CLP.
 
         Esta função é chamada periodicamente
-        por uma thread externa (Thread 2).
+        por uma thread externa.
         """
-        # Gráficos em função do tempo, histórico no banco, verificar se os dados estão atualizados.
 
-        self._meas["timestamp"] = time.time()  # horário atual do sistema
-        self._meas["values"] = {}              # Cria um dicionário vazio
+        self._meas["timestamp"] = time.time()
+        self._meas["values"] = {}
+        with self._lock:
+            for nome, cfg in self._tags.items():
+                try:
+                    # Leitura conforme o tipo
+                    if cfg["type"] == "FP":
+                        valor = self._read_float(cfg["addr"])
+                    elif cfg["type"] == "BIT":
+                        valor = self._read_bit(cfg["addr"], cfg["bit"])
 
-        for nome, cfg in self._tags.items():
-            try:
-                # Identifica o tipo da variável e faz a leitura adequada
-                if cfg["type"] == "FP":
-                    valor = self._read_float(cfg["addr"])
-                elif cfg["type"] == "BIT":
-                    valor = self._read_bit(cfg["addr"], cfg["bit"])
-                else:  # 4X padrão
-                    reg = self.client.read_holding_registers(
-                        cfg["addr"], 1)
-                    valor = reg[0] if reg else None
+                    else:  # 4X
+                        reg = self.client.read_holding_registers(cfg["addr"], 1)
+                        valor = reg[0] if reg else None
 
-                # Aplica fator de escala, se existir
-                if valor is not None:
-                    self._meas["values"][nome] = valor / cfg.get("div", 1)
+                    # Aplica fator de escala
+                    if valor is not None:
+                        self._meas["values"][nome] = valor / cfg.get("div", 1)
 
-            except Exception as e:
-                print(f"Erro Modbus ({nome}): {e}")
+                except Exception as e:
+                    print(f"⚠️ Erro Modbus ({nome}): {e}")
+        # print(self._meas)
 
-        try:
-            # Envia os dados para a ponte de comunicação
-            com.enviar(Mensagem(
-                tipo="dados_monitoramento",
-                dados=self._meas.copy(),
-                origem="monitoramento"
-            ))
+        # # 🔽 Comunicação SIMPLIFICADA
+        # try:
+        #     # Envia direto os dados para quem estiver ouvindo (UI)
+        #     com.enviar("dados_monitoramento", self._meas.copy())
 
-            if not self._online:
-                self._online = True
-                com.enviar(Mensagem(
-                    tipo="status",
-                    dados={"online": True},
-                    origem="monitoramento"
-                ))
+        # except Exception as e:
+        #     print(f"⚠️ Erro ao enviar dados: {e}")
 
-        except Exception:
-            if self._online:
-                self._online = False
-                com.enviar(Mensagem(
-                    tipo="status",
-                    dados={"online": False},
-                    origem="monitoramento"
-                ))
 
     # 7. ATUAÇÃO E CONTROLE DO PROCESSO
 
@@ -256,55 +244,73 @@ class Monitoramento:
         """
         Seleciona o tipo de partida do motor.
         """
-        self._ultimo_driver = metodo
-        self.client.write_single_register(
-            self._controls["sel_driver"]["addr"], metodo
-        )
+        with self._lock:
+            self.client.write_single_register(self._controls["sel_driver"]["addr"], metodo )
 
-    def ligar_motor(self, comando):
-        """
-        Envia comando de atuação ao motor.
-        """
-        if self._ultimo_driver == 1:
-            self.client.write_single_register(
-                self._controls["soft"]["addr"], comando)
-        elif self._ultimo_driver == 2:
-            self.client.write_single_register(
-                self._controls["inversor"]["addr"], comando)
-        elif self._ultimo_driver == 3:
-            self.client.write_single_register(
-                self._controls["direta"]["addr"], comando)
+    def ligar_motor(self):
+        with self._lock:
 
+            try: 
+                tipo_partida = self._meas["values"].get("co.indica_driver")
+
+                if tipo_partida == 1:  # Soft-Start
+                    is_active = self.client.read_holding_registers(886, 1)[0]
+                    if is_active:
+                        self.client.write_single_register( 1316, 0)
+                    else:
+                        self.client.write_single_register( 1316, 1)
+
+                elif tipo_partida == 2:  # Inversor
+                    is_active = self.client.read_holding_registers(888, 1)[0]
+                    if is_active:
+                        self.client.write_single_register( 1312, 0)
+                    else:
+                        self.client.write_single_register( 1312, 1)
+
+                elif tipo_partida == 3:  # Direta
+                    is_active = self.client.read_holding_registers(890, 1)[0]
+                    if is_active:
+                        self.client.write_single_register( 1319, 0)
+                    else:
+                        self.client.write_single_register( 1319, 1)
+                else:
+                    print("vaor lido errado")
+            except Exception as e:
+                print("Erro de liga_motor:", e.args)
+            
+    def abre_valvula(self, numero):
+        """
+        Aciona uma válvula XV individualmente (toggle).
+        """
+        if numero < 1 or numero > 6:
+            return
+        with self._lock:
+            reg = self.client.read_holding_registers(712, 1)
+        if not reg:
+            return
+        valor = reg[0]
+        bit = numero - 1
+
+        # Toggle: se estiver fechada abre, se estiver aberta fecha
+    
+        if (valor >> bit) & 1 == 0:
+            valor |= (1 << bit)
+        else:
+            valor &= ~(1 << bit)
+
+        with self._lock:
+            self.client.write_single_register(712, valor)
+        
     def set_velocidade(self, valor):
         """
         Define a velocidade do motor
         quando o sistema estiver operando
         em modo inversor.
         """
-        self.client.write_single_register(
-            self._controls["vel"]["addr"], int(valor)
-        )
-
-    def set_valvula(self, numero, aberta):
-        """
-        Aciona uma válvula XV individualmente.
-        """
-        if numero < 1 or numero > 6:
-            return
-
-        reg = self.client.read_holding_registers(712, 1)
-        if not reg:
-            return
-
-        valor = reg[0]
-        bit = numero - 1
-
-        if aberta:
-            valor |= (1 << bit)
-        else:
-            valor &= ~(1 << bit)
-
-        self.client.write_single_register(712, valor)
+        with self._lock:
+            self.client.write_single_register(
+                self._controls["vel"]["addr"], int(valor)
+            )
 
     def _write_float(self, addr, valor):
         """
@@ -312,9 +318,10 @@ class Monitoramento:
         em dois registradores consecutivos do CLP.
         """
         # regs = struct.unpack(">HH", struct.pack(">f", float(valor)))
-        regs = ModbusTcpClient.convert_to_registers(
-            float(valor), ModbusTcpClient.DATATYPE.FLOAT32, word_order='little')
-        self.client.write_multiple_registers(addr, list(regs))
+        with self._lock:
+            regs = ModbusTcpClient.convert_to_registers(
+                float(valor), ModbusTcpClient.DATATYPE.FLOAT32, word_order='little')
+            self.client.write_multiple_registers(addr, list(regs))
 
     def set_pid(self, p=None, i=None, d=None, sp=None, mv=None):
         """
@@ -333,44 +340,18 @@ class Monitoramento:
 
     # 8. PROCESSAMENTO DE COMANDOS DA INTERFACE
 
-    def _processar_comando_kivy(self, comando):
-        """
-        Recebe comandos enviados pela interface gráfica
-        e executa a ação correspondente no CLP.
-        """
-        print("COMANDO RECEBIDO:", comando)
-
-        acao = comando.get("acao")
-
-        if acao == "set_driver":
-            self.set_metodo_partida(comando["valor"])
-
-        elif acao == "motor":
-            self.ligar_motor(comando["valor"])
-
-        elif acao == "velocidade":
-            self.set_velocidade(comando["valor"])
-
-        elif acao == "valvula":
-            self.set_valvula(
-                comando["numero"],
-                comando["aberta"]
-            )
-
-        elif acao == "pid":
-            self.set_pid(**comando["parametros"])
-
     def executar_monitoramento(self, scan_time=2):
+        """
+        Loop principal de monitoramento.
+        Executa a leitura periódica do CLP.
+        """
+
         while True:
             try:
-                self.readData()
-                com.despachar_comandos()
-            except Exception:
-                if self._online:
-                    self._online = False
-                    com.enviar(Mensagem(
-                        tipo="status",
-                        dados={"online": False},
-                        origem="monitoramento"
-                    ))
+                if self.client.is_open:
+                    self.readData()
+                else:
+                    print("cliente fechado")
+            except Exception as e:
+                print(f"⚠️ Erro no monitoramento: {e}")
             time.sleep(scan_time)

@@ -1,0 +1,532 @@
+#:kivy 2.3.1
+#:import dp kivy.metrics.dp
+
+<MainButton@MDRaisedButton>:
+    size_hint: None, None
+    height: dp(45)
+    md_bg_color: 0.776, 0.776, 0.776, 1
+    text_color: 0, 0, 0, 1
+
+<MainLabel@MDLabel>:
+    font_style: "H5"        
+    size_hint_y: None
+    height: dp(30)
+    theme_text_color: "Primary"
+    halign: "center"
+
+<Reservoir@MDBoxLayout>:
+    orientation: "vertical"
+    size_hint: None, None
+    size: dp(250), dp(260)
+
+    title: ""
+    img_path: ""
+
+    MainLabel:
+        text: root.title
+
+    Image:
+        source: root.img_path
+        size_hint: None, None
+        size: dp(250), dp(200)
+        allow_stretch: True
+        keep_ratio: False
+        pos_hint: {"center_x": 0.5}
+
+<SensorState@MDBoxLayout>:
+    orientation: "vertical"
+    size_hint: None, None
+    size: dp(120), dp(40)
+    radius: [8]
+
+    title: ""
+    id_label: ""
+
+    canvas.before:
+        Color:
+            rgba: 0, 0, 0, 1
+        Line:
+            width: 2
+            rounded_rectangle: (self.x, self.y, self.width, self.height, 8)
+
+    MainLabel:
+        id: root.id_label
+        text: root.title
+        font_style: "H6"
+
+<Connection@Widget>:
+    size_hint: None, None
+
+    canvas:
+        Color:
+            rgba: 160/255, 160/255, 164/255, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+# Classes auxiliares para construção do bloco ruler
+
+<ValueLabel@MDLabel>:
+    font_style: "H5"
+    font_size: "20sp"
+    bold: True
+    text_color: 0, 0, 0, 1
+    pos_hint: {"x": 0.44, "center_y": 0.68}
+
+<UnitLabel@MDLabel>:
+    font_style: "H5"
+    font_size: "15sp"
+    pos_hint: {"x": 0.82, "center_y": 0.65}
+
+<IdentifyLabel@MDLabel>:
+    font_style: "H5"
+    font_size: "15sp"
+    pos_hint: {"x": 0.12, "center_y": 0.65}
+
+<RulerImage@Image>:
+    source: "images/ruler.png"
+    size_hint: None, None
+    size: dp(200), dp(40)
+    pos_hint: {"x": 0, "center_y": 0.43}
+
+<LevelIndicator@MDFloatLayout>:
+    size_hint: None, None
+    size: dp(200), dp(40)
+    pos_hint: {"x": 0, "center_y": 0.43}
+    
+    value: 0
+    max_value: 100
+
+    MDFloatLayout:
+        size_hint: None, None
+        size: dp(158), dp(20)
+        pos_hint: {"x": 0.1, "center_y": 0.43}
+
+        canvas.before:
+            Color:
+                rgba: 160/255, 160/255, 164/255, 1
+
+            Rectangle:
+                pos: (self.x + 4, self.y + 4)
+                size: ((self.width - 8) * root.value / (root.max_value if root.max_value > 0 else 1), self.height - 8)
+
+<MinValueLabel@MDLabel>:
+    font_style: "H5"
+    font_size: "15sp"
+    pos_hint: {"x": 0.12, "center_y": 0.28}
+
+<MaxValueLabel@MDLabel>:
+    font_style: "H5"
+    font_size: "15sp"
+    pos_hint: {"x": 0.85, "center_y": 0.28}
+
+<GraphButton@MDIconButton>:
+    var: ""
+    icon: "images/graph.png"
+    pos_hint: {"x": -0.1, "center_y": 0.4}
+    on_release: app.root.abrir_grafico(self.parent.label_text, self.parent.var, self.parent.unit, self.parent.max_value)
+
+# Classe do bloco ruler
+<MarkValueLabel@MDLabel>:
+    font_style: "H5"
+    font_size: "15sp"
+    pos_hint: {"center_x": 1.15, "center_y": 0.22}
+
+<AlertIndicator@Image>:
+    source: "images/warn_4.png"
+    size_hint: None, None
+    size: dp(80), dp(25)
+    opacity: 0
+    pos_hint: {"x": .9, "center_y": 0.43}
+
+<Ruler@MDFloatLayout>:
+    size_hint: None, None
+    size: dp(200), dp(100)
+    spacing: dp(10)
+    
+    value: 0
+    unit: ""
+    label_text: ""
+    min_value: 0
+    max_value: 0
+    var: ""
+
+    # ADICIONE O ValueLabel AQUI (você removeu por engano)
+    ValueLabel:
+        text: f"{root.value:.2f}"
+
+    UnitLabel:
+        text: root.unit
+
+    IdentifyLabel:
+        text: root.label_text
+
+    LevelIndicator:
+        value: root.value
+        max_value: root.max_value
+
+    RulerImage:
+
+    MinValueLabel:
+        text: f"{root.min_value}"
+
+    MarkValueLabel:
+        text: f"{root.max_value*0.75:.0f}"
+
+    MaxValueLabel:
+        text: f"{root.max_value}"
+    
+    AlertIndicator:
+
+# REMOVA UMA DAS DEFINIÇÕES DUPLICADAS DE RotatedRuler
+# Mantenha apenas esta:
+
+<RotatedRuler@MDFloatLayout>:
+    size_hint: None, None
+    size: dp(200), dp(100)
+    
+    # Propriedades
+    value: 0
+    unit: ""
+    label_text: ""
+    min_value: 0
+    max_value: 0
+    var: ""
+            
+    GraphButton:
+        var: root.var
+        pos_hint: {"center_x": 0.55, "y": -0.7}
+
+    MDFloatLayout:
+        size: root.size
+        pos: root.pos
+        
+        canvas.before:
+            PushMatrix 
+            Rotate:
+                angle: 90
+                origin: self.center
+        canvas.after:
+            PopMatrix
+            
+        ValueLabel:
+            text: f"{root.value:.2f}"
+        
+        UnitLabel:
+            text: root.unit
+        
+        IdentifyLabel:
+            text: root.label_text
+        
+        RulerImage:
+        
+        LevelIndicator:
+            value: root.value
+            max_value: root.max_value
+        
+        MinValueLabel:
+            text: f"{root.min_value}"
+        
+        MaxValueLabel:
+            text: f"{root.max_value}"
+    
+# =======================
+# BOTÃO ISA SIMPLES
+# =======================
+
+<ISAButton@Button>:
+    background_normal: ""
+    background_down: ""
+    background_color: 0.88, 0.88, 0.88, 1
+    color: 0.12, 0.12, 0.12, 1
+    font_size: "15sp"
+    bold: True
+
+<ClickableImage@Image>:
+    allow_stretch: True
+    keep_ratio: True
+
+
+# =======================
+# TELA PRINCIPAL
+# =======================
+
+<MainWidget>:
+
+    MDFloatLayout:
+        canvas.before:
+            Color:
+                rgba: 0.92, 0.92, 0.92, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        # ================= BARRA SUPERIOR =================
+        MDCard:
+            size_hint: 1, None
+            height: dp(80)
+            pos_hint: {"top": 1}
+            radius: [0, 0, 12, 12]
+            padding: dp(12)
+            spacing: dp(10)
+            md_bg_color: 0.65, 0.65, 0.65, 1
+
+            MDBoxLayout:
+                orientation: "horizontal"
+                spacing: dp(14)
+
+                # -------- TÍTULO --------
+                MDLabel:
+                    text: "SISTEMA SUPERVISÓRIO – COMPRESSOR"
+                    font_style: "H6"
+                    bold: True
+                    halign: "left"
+                    valign: "middle"
+                    size_hint_x: 0.4
+
+                # -------- CARD DE CONEXÃO --------
+                MDCard:
+                    orientation: "horizontal"
+                    spacing: dp(10)
+                    size_hint: None, None
+                    size: dp(315), dp(60)
+                    md_bg_color: 0.93, 0.93, 0.93, 1
+                    radius: [8]
+                    padding: dp(6)
+
+                    MDRaisedButton:
+                        text: "Conectar CLP"
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.abrir_popup_conexao()  
+
+                    MDRaisedButton:
+                        text: "Desconectar"
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.desconectar_clp()
+
+                    Image:
+                        id: connection_image
+                        source: "images/server_disconnected.png"
+                        size_hint: None, None
+                        size: dp(50), dp(50)
+                        allow_stretch: True
+                        keep_ratio: True
+
+        # -------- PLANTA --------
+        Image:
+            source: "images/planta.png"
+            pos_hint: {"x": 0.10, "y": 0}
+            size_hint: 1, None
+            height: self.parent.height - dp(70)
+            allow_stretch: True
+            keep_ratio: True
+
+        # -------- MOTOR --------
+        ClickableImage:
+            id: motor_1
+            source: "images/motor_off.png"
+            size_hint: None, None
+            size: dp(70), dp(60)
+            pos_hint: {"x": 0.268, "y": 0.45}
+            on_release: root.toggle_motor()
+        ClickableImage:
+            id: valvula_2
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.88, "y": 0.595}
+            on_release: root.toggle_valvula(2)
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+        ClickableImage:
+            id: valvula_3
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.89, "y": 0.48}
+            on_release: root.toggle_valvula(3)
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+        ClickableImage:
+            id: valvula_4
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.89, "y": 0.38}
+            on_release: root.toggle_valvula(4)
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+        ClickableImage:
+            id: valvula_5
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.89, "y": 0.267}
+            on_release: root.toggle_valvula(5)
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+        ClickableImage:
+            id: valvula_6
+            source: "images/valve_off.png"
+            size_hint: None, None
+            size: dp(50), dp(60)
+            pos_hint: {"x": 0.89, "y": 0.155}
+            on_release: root.toggle_valvula(6)
+
+            canvas.before:
+                PushMatrix
+                Rotate:
+                    angle: 90
+                    origin: self.center
+            canvas.after:
+                PopMatrix
+        Label:
+            text: "xv_06"
+            color: (0,0,0,1)
+            pos_hint: {"x": 0.43, "y": -0.31}
+
+        Label:
+            text: "xv_05"
+            color: (0,0,0,1)
+            pos_hint: {"x": 0.43, "y": -0.20}
+
+        Label:
+            text: "xv_04"
+            color: (0,0,0,1)
+            pos_hint: {"x": 0.43, "y": -0.089}
+        Label:
+            text: "xv_03"
+            color: (0,0,0,1)
+            pos_hint: {"x": 0.43, "y": 0.02}
+
+        Label:
+            text: "xv_02"
+            color: (0,0,0,1)
+            pos_hint: {"x": 0.425, "y": 0.13}
+
+        # ================= MENU LATERAL =================
+        MDCard:
+            size_hint: None, None
+            size: dp(200), dp(280)  
+            pos_hint: {"x": 0.02, "top": 0.4}  
+            radius: [12]  
+            padding: dp(15)
+            md_bg_color: 0.96, 0.96, 0.96, 1  
+            elevation: 5  
+
+            MDCard:
+                orientation: "vertical"
+                padding: dp(10)
+                spacing: dp(5)
+                md_bg_color: 1, 1, 1, 1
+                elevation: 2
+                radius: [8]
+
+
+                MDRaisedButton:
+                    text: "COMANDO"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_menu_comando()
+
+                MDRaisedButton:
+                    text: "MEDIÇÕES"
+                    size_hint: None, None
+                    size: dp(110), dp(44)
+                    padding: 0, 0
+                    md_bg_color: 0.85, 0.85, 0.85, 1
+                    text_color: 0, 0, 0, 1
+                    elevation: 1
+                    on_release: root.abrir_medicoes()
+
+                MainButton:
+                    id: scan_time_button
+                    text: "BANCO DE DADOS"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.110}
+                    on_release: root.open_scan_time_dialog()
+                    
+# =============================================================================
+# Torque
+# =============================================================================
+        Ruler:
+            id: torque_ruler
+            label_text: "Torque"
+            unit: "N.m"
+            value: root.torque
+            max_value: 5
+            min_value: 0
+            var: "torque"
+            pos_hint: {"center_x": 0.1, "center_y": 0.8}
+
+            GraphButton:
+
+# =============================================================================
+# Rotação
+# =============================================================================
+        Ruler:
+            id: rotation_ruler
+            label_text: "Rotação"
+            unit: "RPM"
+            value: root.rotation
+            max_value: 4000
+            min_value: 0
+            var: "rotation"
+            pos_hint: {"center_x": 0.1, "center_y": 0.65}
+
+            GraphButton:
+
+# =============================================================================
+# Vazão FIT-03
+# =============================================================================
+        Ruler:
+            id: flow_ruler
+            label_text: "Vazão"
+            unit: "m³/h"
+            value: root.flow_rate
+            max_value: 4
+            min_value: 0
+            var: "flow_rate"
+            pos_hint: {"center_x": 0.3, "center_y": 0.8}
+
+            GraphButton:
+
+# =============================================================================
+# Pressão
+# =============================================================================
+        Ruler:
+            id: pressao_ruler
+            label_text: "Pressão"
+            unit: "kgf/cm²"
+            value: root.pressao
+            max_value: 10
+            min_value: 0
+            var: "pressao"
+            pos_hint: {"center_x": 0.3, "center_y": 0.65}
+
+            GraphButton:
+
+

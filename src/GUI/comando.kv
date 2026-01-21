@@ -1,0 +1,94 @@
+#:kivy 2.3.1
+#:import dp kivy.metrics.dp
+
+# =======================
+# POPUP DE COMANDO
+# =======================
+
+<CommandPopup>:
+    size_hint: None, None
+    size: dp(420), dp(520)
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: dp(16)
+        spacing: dp(12)
+
+        canvas.before:
+            Color:
+                rgba: 0.96, 0.96, 0.96, 1
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [12]
+
+        Label:
+            text: "COMANDOS DO MOTOR"
+            size_hint_y: None
+            height: dp(36)
+            bold: True
+            font_size: "18sp"
+            color: 0.15, 0.15, 0.15, 1
+
+        ISAButton:
+            text: "RESETAR MOTOR"
+            size_hint_y: None
+            height: dp(46)
+            on_release: root.main_widget.toggle_motor()
+
+        Label:
+            text: "TIPO DE PARTIDA"
+            size_hint_y: None
+            height: dp(28)
+            bold: True
+            color: 0.2, 0.2, 0.2, 1
+
+        Spinner:
+            id: sp_partida
+            text: "Direta"
+            values: ["Direta", "Inversor", "Soft-Start"]
+            size_hint_y: None
+            height: dp(44)
+            on_text: root.main_widget.set_tipo_partida(self.text)
+
+        Label:
+            text: "VELOCIDADE (RPM – INVERSOR)"
+            size_hint_y: None
+            height: dp(28)
+            bold: True
+            color: 0.2, 0.2, 0.2, 1
+
+        Slider:
+            id: sl_rpm
+            min: 0
+            max: 3600
+            value: 1800
+            step: 10
+            disabled: sp_partida.text != "Inversor"
+            on_value:
+                lbl_rpm.text = f"{int(self.value)} RPM"
+                root.main_widget.atualizar_velocidade(self.value)
+
+        Label:
+            id: lbl_rpm
+            text: "1800 RPM"
+            size_hint_y: None
+            height: dp(24)
+            halign: "center"
+            valign: "middle"
+            text_size: self.size
+            color: (0,0,0,1)
+
+        ISAButton:
+            text: "ENVIAR SETPOINT"
+            size_hint_y: None
+            height: dp(44)
+            disabled: sp_partida.text != "Inversor"
+            on_release: root.main_widget.enviar_setpoint(sl_rpm.value)
+
+        ISAButton:
+            text: "FECHAR"
+            size_hint_y: None
+            height: dp(42)
+            on_release: root.dismiss()

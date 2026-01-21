@@ -1,0 +1,709 @@
+#:kivy 2.3.1
+#:import dp kivy.metrics.dp
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+
+<MedicoesPopup>:
+    # Layout principal - preenche TODO o ModalView
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 0
+        spacing: 0
+        size: root.size
+        pos: root.pos
+        
+        # CABEÇALHO FIXO (não rola)
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: None
+            height: dp(140)  # Altura fixa para cabeçalho
+            padding: dp(10)
+            spacing: dp(5)
+            md_bg_color: 0.2, 0.2, 0.3, 1  # Azul escuro para cabeçalho
+            
+            # Título PRINCIPAL
+            MDLabel:
+                text: root.titulo_atual
+                halign: 'center'
+                font_style: 'H4'
+                size_hint_y: None
+                height: dp(60)
+                theme_text_color: 'Custom'
+                text_color: 1, 1, 1, 1  # Texto branco
+                bold: True
+                valign: 'middle'
+            
+            # Botões de navegação
+            MDBoxLayout:
+                orientation: 'horizontal'
+                spacing: dp(5)
+                size_hint_y: None
+                height: dp(60)
+                padding: [dp(5), 0, dp(5), 0]
+
+                MDRaisedButton:
+                    text: 'TEMPERATURAS'
+                    size_hint_x: 1
+                    on_release: root.mostrar_temperaturas()
+                    md_bg_color: root.cor_botao_ativo if root.tipo_medicao == 'temperaturas' else root.cor_botao_inativo
+                    text_color: root.cor_texto_botao
+                    theme_text_color: 'Custom'
+                    font_size: '11sp'
+
+                MDRaisedButton:
+                    text: 'CORRENTES'
+                    size_hint_x: 1
+                    on_release: root.mostrar_correntes()
+                    md_bg_color: root.cor_botao_ativo if root.tipo_medicao == 'correntes' else root.cor_botao_inativo
+                    text_color: root.cor_texto_botao
+                    theme_text_color: 'Custom'
+                    font_size: '11sp'
+
+                MDRaisedButton:
+                    text: 'TENSÕES'
+                    size_hint_x: 1
+                    on_release: root.mostrar_tensoes()
+                    md_bg_color: root.cor_botao_ativo if root.tipo_medicao == 'tensoes' else root.cor_botao_inativo
+                    text_color: root.cor_texto_botao
+                    theme_text_color: 'Custom'
+                    font_size: '11sp'
+
+                MDRaisedButton:
+                    text: 'FATOR POT.'
+                    size_hint_x: 1
+                    on_release: root.mostrar_fator_potencia()
+                    md_bg_color: root.cor_botao_ativo if root.tipo_medicao == 'fator_potencia' else root.cor_botao_inativo
+                    text_color: root.cor_texto_botao
+                    theme_text_color: 'Custom'
+                    font_size: '11sp'
+
+                MDRaisedButton:
+                    text: 'THD'
+                    size_hint_x: 1
+                    on_release: root.mostrar_thd()
+                    md_bg_color: root.cor_botao_ativo if root.tipo_medicao == 'thd' else root.cor_botao_inativo
+                    text_color: root.cor_texto_botao
+                    theme_text_color: 'Custom'
+                    font_size: '11sp'
+        
+        # ÁREA DE CONTEÚDO COM SCROLL (rola independente)
+        ScrollView:
+            size_hint_y: 1
+            do_scroll_x: False
+            do_scroll_y: True
+            bar_width: dp(10)
+            bar_color: 0.5, 0.5, 0.5, 1
+            bar_inactive_color: 0.7, 0.7, 0.7, 1
+            
+            GridLayout:
+                cols: 1
+                spacing: dp(10)
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(15), dp(10), dp(15), dp(10)]
+                md_bg_color: 1, 1, 1, 1
+
+                # ============================================
+                # CARD DE TEMPERATURAS (2 variáveis REAIS)
+                # ============================================
+                MDCard:
+                    id: card_temperaturas
+                    orientation: 'vertical'
+                    padding: dp(15)
+                    spacing: dp(10)
+                    size_hint: 1, None
+                    height: dp(160) if root.tipo_medicao == 'temperaturas' else 0
+                    opacity: 1 if root.tipo_medicao == 'temperaturas' else 0
+                    md_bg_color: 0.97, 0.97, 0.97, 1
+                    radius: [dp(10)]
+
+                    MDLabel:
+                        text: 'TEMPERATURAS'
+                        halign: 'center'
+                        font_style: 'H5'
+                        size_hint_y: None
+                        height: dp(30)
+                        theme_text_color: 'Custom'
+                        text_color: 0.1, 0.1, 0.1, 1
+                        bold: True
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(8)
+
+                        # Temperatura Carcaça
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Temperatura Carcaça:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: temp_carc_label
+                                text: '0.0 °C'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Temperatura Enrolamento R
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Temp. Enrolamento R:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: temp_r_label
+                                text: '0.0 °C'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                # ============================================
+                # CARD DE CORRENTES (5 variáveis REAIS)
+                # ============================================
+                MDCard:
+                    id: card_correntes
+                    orientation: 'vertical'
+                    padding: dp(15)
+                    spacing: dp(10)
+                    size_hint: 1, None
+                    height: dp(350) if root.tipo_medicao == 'correntes' else 0
+                    opacity: 1 if root.tipo_medicao == 'correntes' else 0
+                    md_bg_color: 0.97, 0.97, 0.97, 1
+                    radius: [dp(10)]
+
+                    MDLabel:
+                        text: 'CORRENTES'
+                        halign: 'center'
+                        font_style: 'H5'
+                        size_hint_y: None
+                        height: dp(30)
+                        theme_text_color: 'Custom'
+                        text_color: 0.1, 0.1, 0.1, 1
+                        bold: True
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(8)
+
+                        # Corrente Fase R
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Corrente Fase R:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: corrente_r_label
+                                text: '0.0 A'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Corrente Fase S
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Corrente Fase S:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: corrente_s_label
+                                text: '0.0 A'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Corrente Fase T
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Corrente Fase T:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: corrente_t_label
+                                text: '0.0 A'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Corrente Neutro
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Corrente Neutro:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: corrente_n_label
+                                text: '0.00 A'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Corrente Média
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Corrente Média:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: corrente_media_label
+                                text: '0.0 A'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                # ============================================
+                # CARD DE TENSÕES (4 variáveis REAIS)
+                # ============================================
+                MDCard:
+                    id: card_tensoes
+                    orientation: 'vertical'
+                    padding: dp(15)
+                    spacing: dp(10)
+                    size_hint: 1, None
+                    height: dp(290) if root.tipo_medicao == 'tensoes' else 0
+                    opacity: 1 if root.tipo_medicao == 'tensoes' else 0
+                    md_bg_color: 0.97, 0.97, 0.97, 1
+                    radius: [dp(10)]
+
+                    MDLabel:
+                        text: 'TENSÕES'
+                        halign: 'center'
+                        font_style: 'H5'
+                        size_hint_y: None
+                        height: dp(30)
+                        theme_text_color: 'Custom'
+                        text_color: 0.1, 0.1, 0.1, 1
+                        bold: True
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(8)
+
+                        # Tensão R-S
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Tensão R-S:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: tensao_rs_label
+                                text: '0.0 V'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Tensão S-T
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Tensão S-T:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: tensao_st_label
+                                text: '0.0 V'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Tensão T-R
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'Tensão T-R:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: tensao_tr_label
+                                text: '0.0 V'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        
+                # ============================================
+                # CARD DE FATOR DE POTÊNCIA (4 variáveis REAIS)
+                # ============================================
+                MDCard:
+                    id: card_fp
+                    orientation: 'vertical'
+                    padding: dp(15)
+                    spacing: dp(10)
+                    size_hint: 1, None
+                    height: dp(290) if root.tipo_medicao == 'fator_potencia' else 0
+                    opacity: 1 if root.tipo_medicao == 'fator_potencia' else 0
+                    md_bg_color: 0.97, 0.97, 0.97, 1
+                    radius: [dp(10)]
+
+                    MDLabel:
+                        text: 'FATOR DE POTÊNCIA'
+                        halign: 'center'
+                        font_style: 'H5'
+                        size_hint_y: None
+                        height: dp(30)
+                        theme_text_color: 'Custom'
+                        text_color: 0.1, 0.1, 0.1, 1
+                        bold: True
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(8)
+
+                        # Fator Potência R
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'FP Fase R:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: fp_r_label
+                                text: '0.000'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Fator Potência S
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'FP Fase S:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: fp_s_label
+                                text: '0.000'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Fator Potência T
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'FP Fase T:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: fp_t_label
+                                text: '0.000'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # Fator Potência Médio
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'FP Médio:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: fp_media_label
+                                text: '0.000'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                # ============================================
+                # CARD DE THD (6 variáveis REAIS)
+                # ============================================
+                MDCard:
+                    id: card_thd
+                    orientation: 'vertical'
+                    padding: dp(15)
+                    spacing: dp(10)
+                    size_hint: 1, None
+                    height: dp(480) if root.tipo_medicao == 'thd' else 0
+                    opacity: 1 if root.tipo_medicao == 'thd' else 0
+                    md_bg_color: 0.97, 0.97, 0.97, 1
+                    radius: [dp(10)]
+
+                    MDLabel:
+                        text: 'THD - DISTORÇÃO HARMÔNICA'
+                        halign: 'center'
+                        font_style: 'H5'
+                        size_hint_y: None
+                        height: dp(30)
+                        theme_text_color: 'Custom'
+                        text_color: 0.1, 0.1, 0.1, 1
+                        bold: True
+
+                    BoxLayout:
+                        orientation: 'vertical'
+                        spacing: dp(8)
+
+                        # THD Tensão R-S
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Tensão R-S:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: thd_tensao_rs_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # THD Tensão S-T
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Tensão S-T:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: thd_tensao_st_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # THD Tensão T-R
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Tensão T-R:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: thd_tensao_tr_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # THD Corrente R
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Corrente R:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: thd_corrente_r_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # THD Corrente S
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Corrente S:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: thd_corrente_s_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+                        # THD Corrente T
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Corrente T:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+                            
+                            MDLabel:
+                                id: thd_corrente_t_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+                            # THD Corrente Neutro
+                        BoxLayout:
+                            spacing: dp(15)
+
+                            MDLabel:
+                                text: 'THD Corrente N:'
+                                font_style: 'Body1'
+                                size_hint_x: 0.7
+                                theme_text_color: 'Custom'
+                                text_color: 0.2, 0.2, 0.2, 1
+    
+                            MDLabel:
+                                id: thd_corrente_n_label
+                                text: '0.0 %'
+                                font_style: 'Body1'
+                                halign: 'right'
+                                size_hint_x: 0.3
+                                theme_text_color: 'Custom'
+                                text_color: 0, 0, 0, 1
+                                bold: True
+
+        
+        # RODAPÉ FIXO (não rola)
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            height: dp(60)
+            padding: dp(10)
+            spacing: dp(10)
+            md_bg_color: 0.2, 0.2, 0.3, 1  # Mesma cor do cabeçalho
+            
+            # Espaço vazio à esquerda
+            Widget:
+                size_hint_x: 0.6
+            
+            # Botão Fechar
+            MDRaisedButton:
+                text: 'FECHAR'
+                size_hint_x: 0.4
+                size_hint_y: 1
+                md_bg_color: 0.6, 0.6, 0.6, 1
+                text_color: 1, 1, 1, 1
+                font_size: '14sp'
+                bold: True
+                on_release: root.dismiss()

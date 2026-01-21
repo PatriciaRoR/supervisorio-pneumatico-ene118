@@ -1,0 +1,40 @@
+#:kivy 2.3.1
+
+<ConnectContent>:
+    orientation: "vertical"
+    padding: dp(20)
+    spacing: dp(15)
+    size_hint_y: None
+    height: dp(250)
+
+    MDTextField:
+        id: ip_input
+        hint_text: "IP do Servidor:"
+        text: "10.15.30.181"
+        helper_text: "Formato: XXX.XXX.XXX.XXX"
+        max_text_length: 15
+
+    MDTextField:
+        id: port_input
+        hint_text: "Porta do Servidor:"
+        text: "502"
+        helper_text: "Porta: 1-65535"
+        input_filter: "int"
+        max_text_length: 5
+
+    MDLabel:
+        halign: "center"
+        id: server_status
+        text: "Falha na conexão"
+        theme_text_color: "Error"
+        opacity: 0
+
+    MDRaisedButton:
+        id: connect_button
+        md_bg_color: app.theme_cls.colors["Gray"]["800"]
+        text: "CONECTAR"
+        size_hint_x: 0.6
+        pos_hint: {"center_x": 0.5}
+        size_hint_y: None
+        height: dp(50)
+        on_release: root.connect_to_server(self)

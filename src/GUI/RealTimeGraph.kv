@@ -1,0 +1,54 @@
+#:kivy 2.3.1
+#:import Graph kivy_garden.graph
+
+<RealTimeGraphContent@MDBoxLayout>:
+    orientation: "vertical"
+    padding: dp(20)
+    spacing: dp(16)
+    size_hint: (1, 1)
+    md_bg_color: 0.15, 0.15, 0.15, 1
+
+    MDLabel:
+        text: "Gráfico em Tempo Real"
+        size_hint_y: None
+        height: dp(40)
+        font_style: "H6"
+
+    Graph:
+        id: graph_widget
+        size_hint: (1, 1)
+
+        x_grid: True
+        x_grid_label: True
+        y_grid: True
+        y_grid_label: True
+
+        xmin: 0
+        ymin: 0
+
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(56)
+        spacing: dp(24)
+
+        MDLabel:
+            text: "Número de pontos do gráfico"
+            size_hint_x: None
+            width: dp(260)
+            valign: "center"
+
+        MDRaisedButton:
+            text: "20"
+            on_release: root.parent.set_points(20)
+
+        MDRaisedButton:
+            text: "50"
+            on_release: root.parent.set_points(50)
+
+        MDRaisedButton:
+            text: "100"
+            on_release: root.parent.set_points(100)
+
+        MDRaisedButton:
+            text: "FECHAR"
+            on_release: root.parent.dismiss()
